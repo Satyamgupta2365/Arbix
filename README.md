@@ -22,7 +22,6 @@
 [![Chain](https://img.shields.io/badge/Chain-BNB%20Testnet-yellow?style=for-the-badge&logo=binance)]()
 [![Python](https://img.shields.io/badge/Python-3.10+-blue?style=for-the-badge&logo=python&logoColor=white)]()
 [![React](https://img.shields.io/badge/React-18+-61DAFB?style=for-the-badge&logo=react&logoColor=black)]()
-[![Solidity](https://img.shields.io/badge/Solidity-0.8+-363636?style=for-the-badge&logo=solidity)]()
 
 <br/>
 
