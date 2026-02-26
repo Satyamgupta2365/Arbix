@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 import asyncio
 import httpx
 import json
+import websockets as ws_client
 
 app = FastAPI()
 
@@ -17,7 +18,7 @@ app.add_middleware(
 
 @app.get("/")
 async def root():
-    return {"message": "Arbix Multi-Coin Backend is running"}
+    return {"message": "Arbix Ultra-Realtime Backend is running"}
 
 @app.get("/price/{symbol}")
 async def get_price(symbol: str):
@@ -29,31 +30,37 @@ async def get_price(symbol: str):
 @app.websocket("/ws/trading/{symbol}")
 async def websocket_endpoint(websocket: WebSocket, symbol: str):
     await websocket.accept()
+    # Binance Stream URL for symbol ticker (mini ticker or individual symbol ticker)
+    # เราจะใช้ <symbol>@ticker สำหรับข้อมูลราคา/high/low/volume แบบ real-time
+    binance_ws_url = f"wss://stream.binance.com:9443/ws/{symbol.lower()}@ticker"
+    
     try:
-        async with httpx.AsyncClient() as client:
+        async with ws_client.connect(binance_ws_url) as bws:
             while True:
-                # Poll Binance 24hr ticker for the specific symbol
-                url = f"https://api.binance.com/api/v3/ticker/24hr?symbol={symbol.upper()}"
-                response = await client.get(url)
-                if response.status_code == 200:
-                    data = response.json()
-                    await websocket.send_json({
-                        "symbol": data["symbol"],
-                        "price": data["lastPrice"],
-                        "change": data["priceChangePercent"],
-                        "high": data["highPrice"],
-                        "low": data["lowPrice"],
-                        "volume": data["volume"]
-                    })
-                else:
-                    await websocket.send_json({"error": "Symbol not found"})
-                    break
-                await asyncio.sleep(1)
+                data = await bws.recv()
+                msg = json.loads(data)
+                
+                # Format to our frontend expectations
+                # e: event type, s: symbol, p: price change, P: price change %, w: weight-avg, x: prev close
+                # c: last price, Q: last quantity, b: best bid, B: best bid qty, a: best ask, A: best ask qty
+                # o: open price, h: high price, l: low price, v: base vol, q: quote vol
+                
+                await websocket.send_json({
+                    "symbol": msg["s"],
+                    "price": msg["c"],
+                    "change": msg["P"],
+                    "high": msg["h"],
+                    "low": msg["l"],
+                    "volume": msg["v"]
+                })
     except WebSocketDisconnect:
         print(f"Client disconnected for {symbol}")
     except Exception as e:
-        print(f"Error for {symbol}: {e}")
-        await websocket.close()
+        print(f"WebSocket error for {symbol}: {e}")
+        try:
+            await websocket.close()
+        except:
+            pass
 
 if __name__ == "__main__":
     import uvicorn

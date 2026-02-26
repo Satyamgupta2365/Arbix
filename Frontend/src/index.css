@@ -1,17 +1,11 @@
 :root {
-  --primary: #C5FF2B;
-  /* Lime Green from image */
-  --secondary: #00D1FF;
-  /* Cyan from image */
-  --tertiary: #FF5C8D;
-  /* Pink from image */
+  --primary: #FCD535;
+  --secondary: #f3ba2f;
+  --accent: #ff9900;
   --background: #000000;
-  --surface: #0A0A0A;
-  --surface-bright: #141414;
+  --surface: #0a0a0a;
   --text: #ffffff;
   --text-muted: #848e9c;
-  --glass: rgba(255, 255, 255, 0.03);
-  --glass-border: rgba(255, 255, 255, 0.1);
 }
 
 * {
@@ -32,150 +26,178 @@ h2,
 h3 {
   font-family: 'Outfit', sans-serif;
   font-weight: 700;
-  letter-spacing: -0.02em;
 }
 
-/* Landing Page Specifics */
-.hero-container {
-  height: 100vh;
-  display: flex;
-  flex-direction: column;
-  position: relative;
+/* Bauhaus / Studio Styles */
+.studio-container {
+  min-height: 100vh;
   padding: 2rem 5rem;
+  position: relative;
+  overflow: hidden;
 }
 
-.navbar {
+.studio-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 5rem;
+  margin-bottom: 8rem;
+  position: relative;
+  z-index: 10;
 }
 
-.nav-links {
+.studio-logo {
+  font-size: 1.8rem;
+  font-weight: 900;
+  letter-spacing: -0.05em;
+  text-transform: uppercase;
+}
+
+.studio-logo span {
+  color: var(--primary);
+}
+
+.studio-nav {
   display: flex;
-  gap: 2.5rem;
+  gap: 3rem;
 }
 
-.nav-links a {
+.studio-nav a {
   color: #fff;
   text-decoration: none;
-  font-size: 0.9rem;
   font-weight: 500;
-  opacity: 0.7;
-  transition: opacity 0.2s;
+  opacity: 0.8;
+  font-size: 1rem;
 }
 
-.nav-links a:hover {
+.studio-nav a:hover {
   opacity: 1;
 }
 
-.hero-content {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  flex: 1;
+.studio-hero {
+  max-width: 800px;
+  position: relative;
+  z-index: 10;
 }
 
-.hero-text {
-  max-width: 500px;
-}
-
-.hero-title {
-  font-size: 5rem;
+.studio-title {
+  font-size: 4.5rem;
   line-height: 1.1;
-  margin-bottom: 2rem;
-}
-
-.hero-subtitle {
-  color: var(--text-muted);
-  font-size: 1.1rem;
-  line-height: 1.6;
   margin-bottom: 3rem;
+  font-weight: 800;
 }
 
-.btn-start {
+.studio-subtitle-underlined {
+  position: relative;
+  display: inline-block;
+}
+
+.studio-subtitle-underlined::after {
+  content: '';
+  position: absolute;
+  bottom: -10px;
+  left: 0;
+  width: 100%;
+  height: 2px;
+  background: rgba(255, 255, 255, 0.4);
+}
+
+.studio-cta-group {
+  display: flex;
+  align-items: center;
+  gap: 2rem;
+  margin-bottom: 5rem;
+}
+
+.btn-studio {
   background: var(--primary);
-  color: #000;
+  color: #fff;
   border: none;
   padding: 1.2rem 2.5rem;
-  border-radius: 50px;
+  border-radius: 8px;
   font-weight: 700;
-  font-size: 1rem;
   cursor: pointer;
-  transition: transform 0.2s, box-shadow 0.2s;
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5rem;
+  font-size: 1.1rem;
+  transition: transform 0.2s;
 }
 
-.btn-start:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 10px 30px rgba(197, 255, 43, 0.3);
+.btn-studio:hover {
+  transform: scale(1.05);
 }
 
-.hero-orb {
-  position: absolute;
-  right: 15%;
-  top: 40%;
-  transform: translateY(-50%);
-  width: 500px;
-  height: 500px;
-  z-index: -1;
-}
-
-.floating-cards {
-  position: absolute;
-  bottom: 10%;
-  left: 5%;
-  display: flex;
-  gap: 1.5rem;
-}
-
-.mini-card {
-  padding: 1.5rem;
-  border-radius: 20px;
-  width: 220px;
-  height: 250px;
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-  backdrop-filter: blur(10px);
-}
-
-.card-pink {
-  background: linear-gradient(135deg, #FF9B9B 0%, #FF5C8D 100%);
-}
-
-.card-teal {
-  background: linear-gradient(135deg, #00D1FF 0%, #0085FF 100%);
-}
-
-.card-glass {
-  background: rgba(255, 255, 255, 0.1);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-}
-
-.card-title {
-  font-size: 1.25rem;
-  font-weight: 700;
-  color: #000;
-}
-
-.card-glass .card-title {
+.btn-outline {
+  background: transparent;
   color: #fff;
+  border: none;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
 }
 
-.card-desc {
-  font-size: 0.85rem;
-  color: rgba(0, 0, 0, 0.7);
-  font-weight: 500;
+.studio-desc {
+  max-width: 350px;
+  color: var(--text-muted);
+  font-size: 1rem;
+  line-height: 1.6;
 }
 
-.card-glass .card-desc {
-  color: rgba(255, 255, 255, 0.7);
+/* Geometric Background Elements */
+.geo-shapes {
+  position: absolute;
+  bottom: -10%;
+  right: -5%;
+  display: flex;
+  align-items: flex-end;
+  gap: 0;
+  pointer-events: none;
 }
 
-/* Dashboard Overhaul */
+.shape-white {
+  width: 350px;
+  height: 700px;
+  background: #fff;
+  border-top-left-radius: 350px;
+  border-bottom-left-radius: 350px;
+}
+
+.shape-orange {
+  width: 350px;
+  height: 350px;
+  background: var(--primary);
+  border-top-left-radius: 350px;
+  border-top-right-radius: 350px;
+}
+
+.shape-pink {
+  width: 350px;
+  height: 175px;
+  background: var(--secondary);
+  border-top-left-radius: 175px;
+  border-top-right-radius: 175px;
+}
+
+.circle-yellow {
+  position: absolute;
+  top: 45%;
+  right: 12%;
+  width: 220px;
+  height: 220px;
+  background: #D4AF37;
+  border-radius: 50%;
+}
+
+.circle-outline {
+  position: absolute;
+  top: 15%;
+  right: 5%;
+  width: 180px;
+  height: 180px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 50%;
+}
+
+/* Dashboard Override for Theme Consistency */
 .dashboard-layout {
   display: flex;
   height: 100vh;
@@ -184,8 +206,8 @@ h3 {
 
 .sidebar-new {
   width: 280px;
-  background: #070707;
-  border-right: 1px solid #111;
+  background: #080808;
+  border-right: 1px solid #1a1a1a;
   padding: 2rem;
   display: flex;
   flex-direction: column;
@@ -205,7 +227,7 @@ h3 {
 }
 
 .coin-card {
-  background: var(--surface-bright);
+  background: #141416;
   border: 1px solid #222;
   border-radius: 16px;
   padding: 1.5rem;
@@ -220,24 +242,16 @@ h3 {
 
 .coin-card.active {
   border-color: var(--primary);
-  box-shadow: 0 0 20px rgba(197, 255, 43, 0.1);
+  box-shadow: 0 0 20px rgba(243, 140, 18, 0.1);
 }
 
-/* Animations */
-@keyframes float {
-  0% {
-    transform: translateY(0px);
-  }
-
-  50% {
-    transform: translateY(-20px);
-  }
-
-  100% {
-    transform: translateY(0px);
-  }
+.btn-primary {
+  background: var(--primary) !important;
+  color: #fff !important;
 }
 
-.floating {
-  animation: float 6s ease-in-out infinite;
+.nav-link.active {
+  color: var(--primary) !important;
+  border-left-color: var(--primary) !important;
+  background: rgba(243, 140, 18, 0.05) !important;
 }
