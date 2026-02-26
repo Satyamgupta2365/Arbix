@@ -1,255 +1,266 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { BrowserRouter as Router, Routes, Route, Link, useNavigate } from 'react-router-dom';
 import { createChart, ColorType } from 'lightweight-charts';
 import {
-    Activity,
-    TrendingUp,
-    TrendingDown,
+    Zap,
     LayoutDashboard,
-    Wallet,
-    History,
-    Settings,
-    Cpu,
-    ArrowUpRight,
-    ArrowDownRight,
-    RefreshCw,
     BarChart3,
-    ShieldCheck,
-    Zap
+    Activity,
+    Wallet,
+    Settings,
+    ArrowRight,
+    ChevronRight,
+    Search,
+    TrendingUp,
+    Cpu
 } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 
-const App = () => {
-    const [data, setData] = useState(null);
-    const [trades, setTrades] = useState([
-        { id: 1, type: 'BUY', price: 64231.50, amount: '0.042', time: '14:20:01', status: 'COMPLETED' },
-        { id: 2, type: 'SELL', price: 64245.20, amount: '0.015', time: '14:21:45', status: 'COMPLETED' },
-        { id: 3, type: 'BUY', price: 64210.10, amount: '0.105', time: '14:23:12', status: 'COMPLETED' },
-    ]);
+// --- Assets ---
+const ORB_IMAGE = "/cyber-trading-orb.png"; // Placeholder for the generated image
+
+// --- Components ---
+
+const LandingPage = () => {
+    const navigate = useNavigate();
+    return (
+        <div className="hero-container">
+            <nav className="navbar">
+                <div className="logo" style={{ color: '#fff', fontSize: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <Zap color="#C5FF2B" fill="#C5FF2B" /> LEARNME
+                </div>
+                <div className="nav-links">
+                    <a href="#">Home</a>
+                    <a href="#">About</a>
+                    <a href="#">Security</a>
+                    <a href="#">Features</a>
+                </div>
+                <button className="btn-start" style={{ padding: '0.8rem 2rem' }}>Join Now</button>
+            </nav>
+
+            <div className="hero-content">
+                <motion.div
+                    initial={{ opacity: 0, x: -50 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    className="hero-text"
+                >
+                    <h1 className="hero-title">Keep Trading <br /> On Track</h1>
+                    <p className="hero-subtitle">
+                        Elevate your asset management with our cutting-edge autonomous intelligence.
+                        Join Arbix for Comprehensive Real-time Insights.
+                    </p>
+                    <button className="btn-start" onClick={() => navigate('/dashboard')}>
+                        Start Now <ArrowRight size={20} />
+                    </button>
+                </motion.div>
+
+                <div className="hero-orb floating">
+                    <img src={ORB_IMAGE} alt="Orb" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+                </div>
+            </div>
+
+            <div className="floating-cards">
+                <motion.div initial={{ y: 50, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.2 }} className="mini-card card-pink">
+                    <div className="card-title">Market <br /> Mastery</div>
+                    <div className="card-desc">Learn the fundamentals of effective trading and risk management strategies.</div>
+                </motion.div>
+                <motion.div initial={{ y: 50, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.3 }} className="mini-card card-teal">
+                    <div className="card-title">Strategic <br /> Arbitrage</div>
+                    <div className="card-desc">Identify cross-market price gaps with sub-millisecond precision.</div>
+                </motion.div>
+                <motion.div initial={{ y: 50, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.4 }} className="mini-card card-glass">
+                    <div className="card-title">Autonomous <br /> Intelligence</div>
+                    <div className="card-desc">Deploy AI agents to monitor and execute trades 24/7 without intervention.</div>
+                </motion.div>
+            </div>
+
+            <div style={{ position: 'absolute', bottom: '5%', right: '5%', textAlign: 'right' }}>
+                <div style={{ fontSize: '3rem', fontWeight: 800 }}>1.2K+</div>
+                <div style={{ color: 'var(--text-muted)' }}>Active Intelligent Agents</div>
+            </div>
+        </div>
+    );
+};
+
+const DashboardPage = () => {
+    const [selectedCoin, setSelectedCoin] = useState('BTCUSDT');
+    const [chartType, setChartType] = useState('area');
+    const [marketData, setMarketData] = useState(null);
     const chartContainerRef = useRef();
     const seriesRef = useRef();
     const wsRef = useRef(null);
 
+    const coins = [
+        { symbol: 'BTCUSDT', name: 'Bitcoin', icon: '₿' },
+        { symbol: 'ETHUSDT', name: 'Ethereum', icon: 'Ξ' },
+        { symbol: 'BNBUSDT', name: 'BNB Chain', icon: '🔶' },
+        { symbol: 'SOLUSDT', name: 'Solana', icon: '◎' },
+        { symbol: 'ADAUSDT', name: 'Cardano', icon: '₳' },
+    ];
+
     useEffect(() => {
-        // WebSocket Connection
-        wsRef.current = new WebSocket('ws://localhost:8000/ws/trading');
+        // Connect to Backend WebSocket for the selected coin
+        wsRef.current = new WebSocket(`ws://localhost:8000/ws/trading/${selectedCoin}`);
 
         wsRef.current.onmessage = (event) => {
             const payload = JSON.parse(event.data);
-            setData(payload);
-
-            // Update chart with real price
-            if (seriesRef.current) {
-                seriesRef.current.update({
-                    time: Math.floor(Date.now() / 1000),
-                    value: parseFloat(payload.price)
-                });
+            if (!payload.error) {
+                setMarketData(payload);
+                if (seriesRef.current) {
+                    seriesRef.current.update({
+                        time: Math.floor(Date.now() / 1000),
+                        value: parseFloat(payload.price)
+                    });
+                }
             }
         };
 
         return () => {
             if (wsRef.current) wsRef.current.close();
         };
-    }, []);
+    }, [selectedCoin]);
 
     useEffect(() => {
         if (!chartContainerRef.current) return;
 
         const chart = createChart(chartContainerRef.current, {
-            layout: {
-                background: { type: ColorType.Solid, color: '#000000' },
-                textColor: '#848e9c',
-            },
-            grid: {
-                vertLines: { color: 'rgba(255, 255, 255, 0.02)' },
-                horzLines: { color: 'rgba(255, 255, 255, 0.02)' },
-            },
+            layout: { background: { type: ColorType.Solid, color: '#000000' }, textColor: '#848e9c' },
+            grid: { vertLines: { color: '#111' }, horzLines: { color: '#111' } },
             width: chartContainerRef.current.clientWidth,
-            height: 450,
-            timeScale: {
-                timeVisible: true,
-                secondsVisible: true,
-                borderColor: 'rgba(255, 255, 255, 0.1)',
-            },
-            rightPriceScale: {
-                borderColor: 'rgba(255, 255, 255, 0.1)',
-            }
+            height: 400,
+            timeScale: { timeVisible: true, secondsVisible: true },
         });
 
         const series = chart.addAreaSeries({
-            lineColor: '#FCD535',
-            topColor: 'rgba(252, 213, 53, 0.2)',
-            bottomColor: 'rgba(252, 213, 53, 0)',
+            lineColor: '#C5FF2B',
+            topColor: 'rgba(197, 255, 43, 0.2)',
+            bottomColor: 'rgba(197, 255, 43, 0)',
             lineWidth: 2,
         });
 
         seriesRef.current = series;
-
-        const handleResize = () => {
-            chart.applyOptions({ width: chartContainerRef.current.clientWidth });
-        };
-
-        window.addEventListener('resize', handleResize);
-
-        return () => {
-            window.removeEventListener('resize', handleResize);
-            chart.remove();
-        };
+        return () => chart.remove();
     }, []);
 
-    const formatPrice = (price) => {
-        if (!price) return '$0.00';
-        return new Intl.NumberFormat('en-US', {
-            style: 'currency',
-            currency: 'USD',
-        }).format(price);
-    };
-
     return (
-        <div className="app-container" style={{ backgroundColor: '#000' }}>
-            <aside className="sidebar" style={{ backgroundColor: '#0a0a0a', borderRight: '1px solid #1a1a1a' }}>
-                <div className="logo">
-                    <Zap size={32} color="#FCD535" fill="#FCD535" strokeWidth={1} />
-                    <span style={{ color: '#FCD535', fontSize: '1.5rem', fontWeight: 800 }}>ARBIX</span>
+        <div className="dashboard-layout">
+            <aside className="sidebar-new">
+                <div className="logo" style={{ marginBottom: '3rem', fontSize: '1.2rem', fontWeight: 800 }}>
+                    <Zap color="#C5FF2B" fill="#C5FF2B" size={24} /> ARBIX NODE
                 </div>
-
-                <nav>
-                    <a href="#" className="nav-link active">
-                        <LayoutDashboard size={20} /> Dashboard
-                    </a>
-                    <a href="#" className="nav-link">
+                <nav style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                    <Link to="/dashboard" style={{ color: '#C5FF2B', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.8rem', background: 'rgba(197, 255, 43, 0.05)', borderRadius: '10px' }}>
+                        <LayoutDashboard size={20} /> Terminal
+                    </Link>
+                    <Link to="/coins" style={{ color: '#848e9c', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.8rem' }}>
                         <BarChart3 size={20} /> Markets
-                    </a>
-                    <a href="#" className="nav-link">
+                    </Link>
+                    <a href="#" style={{ color: '#848e9c', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.8rem' }}>
                         <Activity size={20} /> Intelligence
                     </a>
-                    <a href="#" className="nav-link">
+                    <a href="#" style={{ color: '#848e9c', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.8rem' }}>
                         <Wallet size={20} /> Wallet
                     </a>
-                    <a href="#" className="nav-link">
-                        <ShieldCheck size={20} /> Security
-                    </a>
-                    <div style={{ marginTop: 'auto', paddingTop: '2rem' }}>
-                        <a href="#" className="nav-link">
-                            <Settings size={20} /> Settings
-                        </a>
-                    </div>
                 </nav>
             </aside>
 
-            <main className="main-content" style={{ background: '#000' }}>
-                <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2.5rem' }}>
-                    <div>
-                        <h1 style={{ fontSize: '2.4rem', color: '#FCD535', letterSpacing: '-0.02em' }}>Trading Terminal</h1>
-                        <p style={{ color: '#848e9c', fontSize: '0.95rem' }}>BTC/USDT Spot • Real-time intelligence node</p>
+            <main className="main-view">
+                <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '3rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', background: '#111', padding: '0.5rem 1.5rem', borderRadius: '50px', width: '400px' }}>
+                        <Search size={18} color="#848e9c" />
+                        <input type="text" placeholder="Search Markets..." style={{ background: 'transparent', border: 'none', color: '#fff', outline: 'none', width: '100%' }} />
                     </div>
-                    <div className="glass-panel" style={{ padding: '0.7rem 1.4rem', display: 'flex', alignItems: 'center', gap: '1.5rem', background: '#111', border: '1px solid #222' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.7rem' }}>
-                            <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#0ecb81', boxShadow: '0 0 15px #0ecb81' }} />
-                            <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#0ecb81', letterSpacing: '0.05em' }}>ENGINE ACTIVE</span>
+                    <div style={{ display: 'flex', gap: '1rem' }}>
+                        <div style={{ background: '#111', padding: '0.5rem 1rem', borderRadius: '10px', fontSize: '0.85rem' }}>
+                            <span style={{ color: '#848e9c' }}>Status:</span> <span style={{ color: '#0ecb81' }}>Live</span>
                         </div>
-                        <button className="btn btn-primary" style={{ padding: '0.6rem 1.2rem', fontSize: '0.85rem', fontWeight: 700 }}>
-                            <RefreshCw size={14} /> LIVE SYNC
-                        </button>
+                        <div style={{ background: '#111', padding: '0.5rem 1rem', borderRadius: '10px', fontSize: '0.85rem' }}>
+                            <span style={{ color: '#848e9c' }}>latency:</span> <span style={{ color: '#C5FF2B' }}>14ms</span>
+                        </div>
                     </div>
                 </header>
 
-                <div className="dashboard-grid" style={{ gridTemplateColumns: 'repeat(4, 1fr)' }}>
-                    {/* Top Bar Stats */}
-                    <div className="glass-card" style={{ gridColumn: 'span 4', display: 'flex', justifyContent: 'space-between', padding: '1.2rem 2.5rem', background: '#0a0a0a', border: '1px solid #1a1a1a' }}>
-                        <div className="stat-group">
-                            <span className="stat-label">Last Price</span>
-                            <span className="stat-value" style={{ color: '#fff', fontSize: '1.4rem' }}>{data ? formatPrice(data.price) : '---'}</span>
-                        </div>
-                        <div className="stat-group">
-                            <span className="stat-label">24h Change</span>
-                            <span className={`stat-value ${parseFloat(data?.change) >= 0 ? 'delta-up' : 'delta-down'}`} style={{ fontSize: '1.4rem' }}>
-                                {data ? (parseFloat(data.change) >= 0 ? '+' : '') + data.change + '%' : '---'}
-                            </span>
-                        </div>
-                        <div className="stat-group">
-                            <span className="stat-label">24h High</span>
-                            <span className="stat-value" style={{ color: '#fff', fontSize: '1.4rem' }}>{data ? formatPrice(data.high) : '---'}</span>
-                        </div>
-                        <div className="stat-group">
-                            <span className="stat-label">24h Low</span>
-                            <span className="stat-value" style={{ color: '#fff', fontSize: '1.4rem' }}>{data ? formatPrice(data.low) : '---'}</span>
-                        </div>
-                        <div className="stat-group">
-                            <span className="stat-label">24h Volume</span>
-                            <span className="stat-value" style={{ color: '#fff', fontSize: '1.4rem' }}>{data ? parseFloat(data.volume).toFixed(2) : '---'} BTC</span>
+                <section>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '2rem' }}>
+                        <h1 style={{ fontSize: '2.5rem' }}>{selectedCoin.replace('USDT', '')} <span style={{ color: '#848e9c', fontSize: '1rem' }}>/ USDT</span></h1>
+                        <div style={{ display: 'flex', gap: '1rem' }}>
+                            <button onClick={() => setChartType('area')} style={{ background: chartType === 'area' ? '#222' : 'transparent', border: '1px solid #333', color: '#fff', padding: '0.4rem 1rem', borderRadius: '6px', cursor: 'pointer' }}>Area</button>
+                            <button onClick={() => setChartType('candle')} style={{ background: chartType === 'candle' ? '#222' : 'transparent', border: '1px solid #333', color: '#fff', padding: '0.4rem 1rem', borderRadius: '6px', cursor: 'pointer' }}>Candlestick</button>
                         </div>
                     </div>
 
-                    {/* Main Chart */}
-                    <motion.div
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        className="glass-panel chart-container"
-                        style={{ gridColumn: 'span 3', padding: '1.8rem', background: '#050505', border: '1px solid #1a1a1a' }}
-                    >
-                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1.5rem' }}>
-                            <div style={{ display: 'flex', gap: '2rem', alignItems: 'center' }}>
-                                <h3 style={{ color: '#FCD535', fontSize: '1.2rem', fontWeight: 700 }}>Market Depth Flow</h3>
-                                <div style={{ display: 'flex', background: '#111', borderRadius: '6px', padding: '3px', border: '1px solid #222' }}>
-                                    {['1m', '5m', '15m', '1h', '4h', '1d'].map(tf => (
-                                        <button key={tf} style={{ background: tf === '1m' ? '#FCD535' : 'transparent', border: 'none', color: tf === '1m' ? '#000' : '#848e9c', padding: '5px 12px', fontSize: '0.8rem', borderRadius: '4px', cursor: 'pointer', fontWeight: 600 }}>{tf}</button>
-                                    ))}
-                                </div>
-                            </div>
-                        </div>
-                        <div ref={chartContainerRef} style={{ width: '100%' }} />
-                    </motion.div>
+                    <div className="glass-panel" style={{ padding: '1.5rem', background: '#070707', border: '1px solid #111' }}>
+                        <div ref={chartContainerRef} style={{ width: '100%', minHeight: '400px' }} />
+                    </div>
 
-                    {/* Right Panel: Trade Log */}
-                    <motion.div
-                        initial={{ opacity: 0, x: 20 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        className="glass-panel"
-                        style={{ gridColumn: 'span 1', padding: '1.8rem', display: 'flex', flexDirection: 'column', background: '#050505', border: '1px solid #1a1a1a' }}
-                    >
-                        <h3 style={{ fontSize: '1.2rem', marginBottom: '1.5rem', color: '#FCD535', fontWeight: 700 }}>Execution Log</h3>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                            {trades.map(trade => (
-                                <div key={trade.id} className="glass-card" style={{ padding: '1rem', background: '#0a0a0a', border: '1px solid #1a1a1a' }}>
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-                                        <span style={{ color: trade.type === 'BUY' ? '#0ecb81' : '#f6465d', fontWeight: 800, fontSize: '0.85rem', letterSpacing: '0.05em' }}>{trade.type}</span>
-                                        <span style={{ color: '#848e9c', fontSize: '0.75rem' }}>{trade.time}</span>
+                    <div style={{ marginTop: '3rem' }}>
+                        <h3 style={{ marginBottom: '1.5rem', color: '#848e9c' }}>Quick Access Assets</h3>
+                        <div className="glass-grid">
+                            {coins.map(coin => (
+                                <div
+                                    key={coin.symbol}
+                                    className={`coin-card ${selectedCoin === coin.symbol ? 'active' : ''}`}
+                                    onClick={() => setSelectedCoin(coin.symbol)}
+                                >
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1rem' }}>
+                                        <span style={{ fontSize: '1.5rem' }}>{coin.icon}</span>
+                                        <TrendingUp size={16} color={selectedCoin === coin.symbol ? '#C5FF2B' : '#444'} />
                                     </div>
-                                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                                        <span style={{ color: '#fff', fontSize: '1rem', fontWeight: 600 }}>{formatPrice(trade.price)}</span>
-                                        <span style={{ color: '#848e9c', fontSize: '0.9rem' }}>{trade.amount} BTC</span>
-                                    </div>
+                                    <div style={{ fontWeight: 700, fontSize: '1.1rem' }}>{coin.name}</div>
+                                    <div style={{ color: '#848e9c', fontSize: '0.8rem' }}>{coin.symbol}</div>
                                 </div>
                             ))}
                         </div>
-
-                        <div style={{ marginTop: 'auto', paddingTop: '2.5rem' }}>
-                            <div className="glass-card" style={{ background: 'rgba(252, 213, 53, 0.03)', border: '1px dashed rgba(252, 213, 53, 0.3)', padding: '1.5rem' }}>
-                                <p style={{ color: '#FCD535', fontSize: '0.8rem', textAlign: 'center', fontWeight: 700, letterSpacing: '0.1em', marginBottom: '1.2rem' }}>TERMINAL CONTROLS</p>
-                                <div style={{ display: 'flex', gap: '0.8rem' }}>
-                                    <button className="btn btn-primary" style={{ flex: 1, fontSize: '0.9rem', fontWeight: 800 }}>BUY</button>
-                                    <button className="btn" style={{ flex: 1, fontSize: '0.9rem', fontWeight: 800, background: '#1a1a1a', color: '#fff', border: '1px solid #333' }}>SELL</button>
-                                </div>
-                                <button className="btn" style={{ width: '100%', marginTop: '0.8rem', background: 'transparent', color: '#848e9c', fontSize: '0.8rem', border: '1px solid #222' }}>CANCEL ALL</button>
-                            </div>
-                        </div>
-                    </motion.div>
-                </div>
+                    </div>
+                </section>
             </main>
-
-            <style dangerouslySetInnerHTML={{
-                __html: `
-        .stat-group { display: flex; flex-direction: column; }
-        .stat-label { color: #848e9c; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 0.4rem; font-weight: 500; }
-        .stat-value { font-family: 'Outfit', sans-serif; font-weight: 800; letter-spacing: -0.01em; }
-        .nav-link.active { color: #FCD535 !important; border-left: 3px solid #FCD535; border-radius: 0; background: linear-gradient(90deg, rgba(252, 213, 53, 0.08) 0%, transparent 100%); font-weight: 700; }
-        .btn-primary { background: #FCD535 !important; color: #000 !important; box-shadow: 0 4px 15px rgba(252, 213, 53, 0.2); }
-        .btn-primary:hover { background: #f3ba2f !important; transform: translateY(-2px); }
-        .delta-up { color: #0ecb81 !important; }
-        .delta-down { color: #f6465d !important; }
-      `}} />
         </div>
     );
 };
+
+const CoinsPage = () => {
+    return (
+        <div className="dashboard-layout">
+            <aside className="sidebar-new">
+                <div className="logo" style={{ marginBottom: '3rem', fontSize: '1.2rem', fontWeight: 800 }}>
+                    <Zap color="#C5FF2B" fill="#C5FF2B" size={24} /> ARBIX
+                </div>
+                <nav style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                    <Link to="/dashboard" style={{ color: '#848e9c', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.8rem' }}>
+                        <LayoutDashboard size={20} /> Terminal
+                    </Link>
+                    <Link to="/coins" style={{ color: '#C5FF2B', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.8rem', background: 'rgba(197, 255, 43, 0.05)', borderRadius: '10px' }}>
+                        <BarChart3 size={20} /> Markets
+                    </Link>
+                </nav>
+            </aside>
+            <main className="main-view">
+                <h1 style={{ fontSize: '2.5rem', marginBottom: '1rem' }}>Market Explorer</h1>
+                <p style={{ color: '#848e9c', marginBottom: '3rem' }}>Monitor and analyze over 500+ algorithmic trading pairs.</p>
+
+                <div className="glass-panel" style={{ padding: '3rem', textAlign: 'center' }}>
+                    <Cpu size={64} color="#C5FF2B" style={{ marginBottom: '1.5rem' }} />
+                    <h2>Intellegence Nodes Processing</h2>
+                    <p style={{ color: '#848e9c', marginTop: '1rem' }}>The full market explorer is aggregating real-time order books from 12 exchanges.</p>
+                    <button className="btn-start" style={{ marginTop: '2rem' }}>Enable Global Scan</button>
+                </div>
+            </main>
+        </div>
+    );
+};
+
+// --- App Wrapper ---
+
+function App() {
+    return (
+        <Router>
+            <Routes>
+                <Route path="/" element={<LandingPage />} />
+                <Route path="/dashboard" element={<DashboardPage />} />
+                <Route path="/coins" element={<CoinsPage />} />
+            </Routes>
+        </Router>
+    );
+}
 
 export default App;
