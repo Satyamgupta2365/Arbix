@@ -1,7 +1,5 @@
 <div align="center">
 
-<br/>
-
 ```
  █████╗ ██████╗ ██████╗ ██╗██╗  ██╗
 ██╔══██╗██╔══██╗██╔══██╗██║╚██╗██╔╝
@@ -11,575 +9,373 @@
 ╚═╝  ╚═╝╚═╝  ╚═╝╚═════╝ ╚═╝╚═╝  ╚═╝
 ```
 
-### **AI-Powered Autonomous Cross-Market Trading Intelligence**
+### **AI-Powered Real-Time Arbitrage Detection Engine for BNB Chain**
 
-*Scan. Detect. Execute. Profit.*
-
-<br/>
+*5 Live Oracles · Bellman-Ford Graph Detection · XAI Decision Engine · 3 Solidity Contracts*
 
 [![License](https://img.shields.io/badge/License-MIT-blue.svg?style=for-the-badge)](LICENSE)
-[![Status](https://img.shields.io/badge/Status-Active%20Development-brightgreen?style=for-the-badge)]()
-[![Chain](https://img.shields.io/badge/Chain-BNB%20Testnet-yellow?style=for-the-badge&logo=binance)]()
+[![Chain](https://img.shields.io/badge/Chain-BNB%20Smart%20Chain-yellow?style=for-the-badge&logo=binance)](https://bscscan.com)
 [![Python](https://img.shields.io/badge/Python-3.10+-blue?style=for-the-badge&logo=python&logoColor=white)]()
 [![React](https://img.shields.io/badge/React-18+-61DAFB?style=for-the-badge&logo=react&logoColor=black)]()
+[![Hackathon](https://img.shields.io/badge/BNB%20Chain%20×%20YZi%20Labs-Hackathon%202025-F0B90B?style=for-the-badge)]()
 
-<br/>
+> **Arbix** monitors price differences across 5 independent real-time oracle sources — including prices read directly from smart contracts on BSC — and uses a 7-stage AI pipeline to detect, score, and explain arbitrage opportunities with full on-chain execution capability via 3 purpose-built Solidity contracts.
 
-> **Arbix** is an autonomous AI agent that continuously scans cryptocurrency and prediction markets, identifies real-time price inefficiencies, and executes risk-adjusted arbitrage trades on-chain — without human intervention.
-
-<br/>
-
-[🚀 Get Started](#-quick-start) · [📖 Documentation](#-documentation) · [🏗 Architecture](#%EF%B8%8F-system-architecture) · [🤝 Contributing](#-contributing) · [🌐 Live Demo](#-live-demo)
-
----
+[Architecture](#architecture) · [Oracles](#oracles) · [AI Engine](#ai-engine) · [Smart Contracts](#smart-contracts) · [Quick Start](#quick-start)
 
 </div>
 
-<br/>
+---
 
-## 📌 Table of Contents
+## What is Arbitrage?
 
-- [Overview](#-overview)
-- [The Problem](#-the-problem)
-- [Our Solution](#-our-solution)
-- [Key Features](#-key-features)
-- [System Architecture](#%EF%B8%8F-system-architecture)
-- [Technology Stack](#-technology-stack)
-- [AI & Intelligence Layer](#-ai--intelligence-layer)
-- [Smart Contract Layer](#-smart-contract-layer)
-- [Quick Start](#-quick-start)
-- [Configuration](#-configuration)
-- [Dashboard](#-dashboard)
-- [Performance & Metrics](#-performance--metrics)
-- [Roadmap](#-roadmap)
-- [Contributing](#-contributing)
-- [Security](#-security)
-- [License](#-license)
-
-<br/>
+The same token (e.g. BNB) trades at slightly different prices on different exchanges at the same moment. PancakeSwap might quote $612.18 while BiSwap quotes $609.07 — a 0.51% spread. Buy on BiSwap, sell on PancakeSwap, pocket the difference. This window lasts milliseconds and requires monitoring 100+ price pairs simultaneously. That's what Arbix does.
 
 ---
 
-## 🌐 Overview
-
-Financial markets — especially decentralized and prediction markets — exhibit constant, temporary price inefficiencies across platforms. These micro-windows of opportunity, known as **arbitrage**, represent billions in untapped, risk-managed profit potential every day.
-
-**Arbix** is the intelligent bridge between opportunity and execution.
-
-Built for the next generation of autonomous finance, Arbix combines real-time data streaming, machine learning decision logic, and on-chain smart contract execution into a single, unified platform. Whether you're a retail participant, a DeFi researcher, or an institutional operator — Arbix levels the playing field.
+## Architecture
 
 ```
-Market A: BTC/USDT @ $43,210.50
-Market B: BTC/USDT @ $43,267.80
-                          ↓
-         Arbix detects ∆ = $57.30 (0.13%)
-                          ↓
-         Risk check → Profitability check → Execute
-                          ↓
-         Net profit locked in < 2 seconds
+┌─────────────────────────────────────────────────────────────────────┐
+│                          5 REAL-TIME ORACLES                        │
+│                                                                     │
+│  Binance REST   CoinGecko REST   PancakeSwap    BiSwap      Pyth   │
+│  (CEX prices)   (700+ exchgs)    (on-chain)    (on-chain)  (oracle)│
+│       │               │              │              │          │    │
+│       └───────────────┴──────────────┴──────────────┴──────────┘   │
+└──────────────────────────────┬──────────────────────────────────────┘
+                               │ parallel fetch every 5s
+                               ▼
+                    ┌─────────────────────┐
+                    │    PRICE MATRIX     │  ← validates, filters zero prices
+                    │  matrix[sym][src]   │  ← rejects DEX quotes >15% from Binance
+                    └──────────┬──────────┘
+                               │
+              ┌────────────────┼────────────────┐
+              ▼                ▼                ▼
+    ┌──────────────┐  ┌──────────────┐  ┌────────────────┐
+    │  ARBITRAGE   │  │   ANOMALY    │  │    SCORING     │
+    │    GRAPH     │  │  DETECTOR    │  │    ENGINE      │
+    │              │  │              │  │                │
+    │ Bellman-Ford │  │ Z-score      │  │ 5-factor score │
+    │ Direct arb   │  │ Source       │  │ Kelly criterion│
+    │ Triangular   │  │ divergence   │  │ position size  │
+    │ Cross-chain  │  │ Regime:      │  │                │
+    └──────┬───────┘  │ CALM/VOLATILE│  └───────┬────────┘
+           │          │ /DISLOCATION │          │
+           └──────────┼──────────────┘          │
+                      ▼                         │
+               ┌──────────────┐                 │
+               │  XAI ENGINE  │◀────────────────┘
+               │              │
+               │ Structured   │
+               │ rationale    │
+               │ per decision │
+               └──────┬───────┘
+                      ▼
+              ┌────────────────┐
+              │  AGENT LOOP    │  ← decides: EXECUTE or SKIP
+              │  (5s cycles)   │  ← adapts thresholds to regime
+              └──────┬─────────┘
+                     ▼
+            ┌─────────────────┐
+            │ PORTFOLIO ENGINE │  ← real P&L: slippage + gas + decay
+            │  (no randomness) │  ← won = (net_pnl > 0)
+            └─────────────────┘
 ```
-
-<br/>
 
 ---
 
-## ⚡ The Problem
+## Oracles
 
-Traditional arbitrage trading is broken for most participants. Here's why:
+Arbix pulls prices from **5 fully independent sources** in parallel. Every DEX price is validated against Binance spot — quotes deviating more than 15% are rejected as low-liquidity noise.
 
-| Challenge | Impact |
-|---|---|
-| 🔍 **No real-time monitoring** | Opportunities vanish in milliseconds |
-| 🧩 **Fragmented data sources** | Incomplete market picture leads to bad decisions |
-| ⚙️ **Complex execution requirements** | Technical barriers exclude retail users |
-| 🧠 **High cognitive load** | Constant vigilance leads to human error and fatigue |
-| 💸 **Fee & slippage blindness** | Profitable-looking trades become losers after costs |
+| Oracle | Source | Method | What It Proves |
+|---|---|---|---|
+| **Binance** | `api.binance.com` | REST, 10/10 symbols | CEX reference price |
+| **CoinGecko** | `api.coingecko.com` | REST, aggregated 700+ exchanges | Broad market consensus |
+| **PancakeSwap** | BSC Mainnet | `eth_call getAmountsOut` on Router `0x10ED43C7...` | #1 BSC DEX, $17M USDT/BNB pool |
+| **BiSwap** | BSC Mainnet | `eth_call getAmountsOut` on Router `0x3a6d8cA2...` | #2 BSC DEX, lower 0.1% fee |
+| **Pyth / Jupiter** | Hermes API | Decentralized oracle, batched 4 feeds/req | Cross-chain price consensus |
 
-> The result? Institutional players with algorithmic edge capture 95%+ of available arbitrage value, while retail and emerging market participants are left behind.
-
-<br/>
-
----
-
-## 💡 Our Solution
-
-Arbix is an **end-to-end autonomous arbitrage intelligence system** built on four pillars:
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│                         ARBIX CORE                          │
-├──────────────┬──────────────┬──────────────┬────────────────┤
-│  📡 STREAM   │  🧠 ANALYZE  │  ⚖️ DECIDE   │  ⛓ EXECUTE   │
-│              │              │              │                │
-│  Real-time   │  AI-powered  │  Risk-aware  │  On-chain via  │
-│  multi-market│  opportunity │  position    │  smart         │
-│  data feeds  │  detection   │  sizing      │  contracts     │
-└──────────────┴──────────────┴──────────────┴────────────────┘
-```
-
-No manual monitoring. No missed windows. No human error.
-
-<br/>
-
----
-
-## ✨ Key Features
-
-### 🔴 Real-Time Market Intelligence
-- Live WebSocket streaming from Binance and multiple exchanges simultaneously
-- Sub-second latency data normalization and cross-market price comparison
-- Automated detection of triangular and cross-exchange arbitrage patterns
-
-### 🧠 AI-Driven Decision Engine
-- Machine learning models trained on historical spread behavior
-- Confidence scoring for each opportunity before execution
-- Dynamic risk tolerance adjustment based on market volatility
-
-### ⚖️ Profitability Guard
-- Automatic fee modeling (maker/taker, gas costs, slippage)
-- Net-profit calculation before every trade decision
-- Minimum threshold enforcement to eliminate false positives
-
-### ⛓️ Autonomous On-Chain Execution
-- Smart contract-based trade execution on BNB Chain Testnet
-- Atomic swap logic to prevent partial fills and stuck positions
-- Full simulation mode for risk-free strategy testing
-
-### 📊 Interactive Analytics Dashboard
-- Real-time P&L tracking and equity curve visualization
-- Opportunity heatmap across exchanges and asset pairs
-- Historical trade log with performance attribution
-
-### 🛡️ Risk Management Framework
-- Per-trade exposure limits and portfolio-level position caps
-- Drawdown circuit breakers with automatic pause logic
-- Volatility-adjusted sizing using Kelly Criterion derivatives
-
-<br/>
-
----
-
-## 🏗️ System Architecture
-
-```
-                         ┌─────────────────────┐
-                         │     ARBIX PLATFORM   │
-                         └─────────┬───────────┘
-                                   │
-         ┌─────────────────────────┼─────────────────────────┐
-         │                         │                         │
-         ▼                         ▼                         ▼
-┌─────────────────┐    ┌───────────────────┐    ┌─────────────────────┐
-│   DATA LAYER    │    │    AI CORE LAYER  │    │  EXECUTION LAYER    │
-│                 │    │                   │    │                     │
-│ • Binance WSS   │───▶│ • Opportunity     │───▶│ • Smart Contracts   │
-│ • CEX APIs      │    │   Detector        │    │ • BNB Chain Testnet │
-│ • DEX Oracles   │    │ • Risk Evaluator  │    │ • Atomic Swaps      │
-│ • Price Feeds   │    │ • ML Decision     │    │ • Tx Manager        │
-└─────────────────┘    │   Engine          │    └─────────────────────┘
-                       │ • LLM Reasoning   │
-                       └─────────┬─────────┘
-                                 │
-                                 ▼
-                    ┌────────────────────────┐
-                    │     FRONTEND LAYER     │
-                    │                        │
-                    │ • React Dashboard      │
-                    │ • Live Charts          │
-                    │ • Trade Feed           │
-                    │ • Portfolio Tracker    │
-                    └────────────────────────┘
-```
-
-<br/>
-
----
-
-## 🛠 Technology Stack
-
-### Frontend
-```
-React 18 / Next.js 14     →  Application framework
-Chart.js / Recharts        →  Real-time trading visualizations
-TailwindCSS                →  UI design system
-WebSocket Client           →  Live data subscriptions
-```
-
-### Backend
-```
-Python 3.10+               →  Core runtime
-FastAPI                    →  High-performance REST & WebSocket API
-asyncio                    →  Concurrent market data handling
-Celery + Redis             →  Task queue for trade execution
-```
-
-### AI / ML Layer
-```
-scikit-learn               →  Opportunity scoring models
-NumPy / Pandas             →  Market data processing
-LLM Integration (optional) →  Strategy reasoning & logging
-Custom Decision Engine     →  Rule + ML hybrid arbitrage logic
-```
-
-### Blockchain
-```
-Solidity 0.8+              →  Smart contract development
-Hardhat                    →  Contract testing & deployment
-Web3.py / Ethers.js        →  On-chain interaction
-BNB Chain Testnet          →  Live testnet execution
-```
-
-### Data Sources
-```
-Binance WebSocket API      →  Primary real-time price stream
-PancakeSwap (BSC)          →  DEX price feeds
-CoinGecko / CMC API        →  Reference price data
-Custom Price Aggregator    →  Normalized cross-market feed
-```
-
-<br/>
-
----
-
-## 🤖 AI & Intelligence Layer
-
-The Arbix AI core is what separates this platform from traditional arbitrage bots.
-
-### Opportunity Detection Pipeline
+**On-chain oracle detail**: The PancakeSwap and BiSwap oracles make real `eth_call` RPC calls to BSC (`bsc-dataseed1.binance.org`) calling `getAmountsOut(amountIn, [tokenAddress, USDT])` on each DEX router. No API key. No middleman. The price comes directly from the liquidity pool's reserve ratio on-chain.
 
 ```python
-# Simplified detection flow
-class ArbixDetector:
-    def scan(self, market_snapshot: MarketData) -> list[Opportunity]:
-        spreads = self.calculate_cross_market_spreads(market_snapshot)
-        candidates = self.filter_by_minimum_spread(spreads, threshold=0.05)
-        scored = self.ml_model.score(candidates)               # ML confidence score
-        return [op for op in scored if op.confidence > 0.78]   # Threshold filter
-
-    def evaluate(self, opportunity: Opportunity) -> TradeDecision:
-        net_profit = opportunity.gross_spread - self.fee_model.estimate(opportunity)
-        risk_score = self.risk_engine.evaluate(opportunity, self.portfolio)
-        return TradeDecision(execute=(net_profit > 0 and risk_score < 0.4))
+# Example: price of BNB from PancakeSwap — pure on-chain
+calldata = encode_get_amounts_out(1 * 10**18, WBNB_ADDRESS, USDT_ADDRESS)
+result = eth_call(PANCAKESWAP_ROUTER, calldata)
+bnb_price = decode_uint256(result) / 1e18   # → $612.16
 ```
-
-### Decision Logic Flow
-
-```
-Raw Price Delta
-     │
-     ▼
-Spread Calculation
-     │
-     ▼
-Fee & Slippage Deduction
-     │
-     ▼
-ML Confidence Scoring ──── [< 0.78] ──→ SKIP
-     │ [≥ 0.78]
-     ▼
-Risk Assessment ─────────── [HIGH] ────→ SKIP
-     │ [LOW / MED]
-     ▼
-Position Sizing (Kelly)
-     │
-     ▼
-Execute on Chain ✅
-```
-
-<br/>
 
 ---
 
-## 📜 Smart Contract Layer
+## AI Engine
 
-Arbix uses atomic, gas-optimized smart contracts for on-chain execution on BNB Chain Testnet.
+7 modules form the intelligence pipeline:
 
-```solidity
-// SPDX-License-Identifier: MIT
-pragma solidity ^0.8.19;
+### 1. Price Matrix (`engine/price_matrix.py`)
+Maintains `matrix[symbol][source] = price_point`. Runs all 5 oracle fetches in parallel with `asyncio`. Filters `price <= 0` entries. Removes stale zero-price cache entries immediately.
 
-/// @title ArbixExecutor
-/// @notice Atomic arbitrage execution with built-in profit validation
-contract ArbixExecutor {
-    address public owner;
-    uint256 public minProfitBps = 10; // Minimum 0.1% net profit
+### 2. Arbitrage Graph (`engine/arbitrage_graph.py`)
+Uses **Bellman-Ford algorithm** (same as Dijkstra but handles negative cycles — ideal for arbitrage loop detection) to find:
+- **Direct arb**: 1 coin, 2 sources, price difference
+- **Triangular arb**: USDT→BNB→ETH→USDT on one DEX, detects if the triangle gives more USDT back
+- **Cross-chain arb**: same coin on BSC vs Solana prices (via Pyth)
 
-    event ArbitrageExecuted(
-        address indexed tokenIn,
-        address indexed tokenOut,
-        uint256 amountIn,
-        uint256 profit,
-        uint256 timestamp
-    );
+### 3. Scoring Engine (`engine/scoring.py`)
+Each opportunity is rated on 5 factors:
+1. **Spread strength** — how large is the price gap
+2. **Profitability** — net profit after fees (0.25% PancakeSwap, 0.10% BiSwap, BSC gas ~$0.10)
+3. **Source reliability** — Binance > CoinGecko > DEX (weighted by trust)
+4. **Volume** — is there enough liquidity to fill the trade
+5. **Data freshness** — how old is the price data
 
-    function executeArbitrage(
-        address[] calldata path,
-        uint256 amountIn,
-        uint256 minAmountOut,
-        address[] calldata exchanges
-    ) external onlyOwner returns (uint256 profit) {
-        // Atomic multi-hop execution with profit validation
-        // Reverts entire tx if minimum profit not achieved
-    }
+Position size = **Kelly Criterion**: `f* = (p*b - q) / b` where `p` = win probability, `b` = profit-to-loss ratio.
+
+### 4. XAI Engine (`engine/xai.py`)
+Explainable AI — every trade decision includes a structured natural-language rationale:
+```json
+{
+  "action": "EXECUTE",
+  "rationale": "BTC spread 2.01% between BiSwap ($64,583) and Binance ($65,878). Score: 0.847. Kelly size: $847. Net profit after 0.25% fee + $0.10 gas: $16.23.",
+  "confidence": 0.847,
+  "risks": ["BiSwap liquidity: $218K (moderate)", "BSC gas spike risk: low"]
 }
 ```
 
-> **Note:** All live trading currently runs on BNB Chain Testnet. Mainnet deployment requires additional auditing.
+### 5. Anomaly Detector (`engine/anomaly.py`)
+- **Z-score spike detection**: price moves > 2 standard deviations flagged
+- **Source divergence**: if two normally-correlated sources diverge > 2%, alert
+- **Regime classification**: `CALM → RANGING → TRENDING → VOLATILE → DISLOCATION`
+- The agent tightens/loosens thresholds based on current regime
 
-<br/>
+### 6. Portfolio Engine (`engine/portfolio.py`)
+Real deterministic P&L — zero randomness:
+```python
+gross_pnl    = position_size * net_profit_pct / 100
+slippage     = position_size * 0.0005          # 5 basis points
+gas_cost     = 0.10                             # BSC gas in USD
+exec_decay   = position_size * 0.0002 * 2.0    # 2bps/sec × 2 sec delay
+net_pnl      = gross_pnl - slippage - gas_cost - exec_decay
+won          = (net_pnl > 0)                   # no random.random()
+```
+
+### 7. Agent (`engine/agent.py`)
+Orchestrates the full loop every 5 seconds: `scan → detect → score → decide → execute`. Adapts `min_spread_pct` and `confidence_threshold` based on market regime in real time.
 
 ---
 
-## 🚀 Quick Start
+## Smart Contracts
+
+Three Solidity contracts (BSC Mainnet-ready, awaiting deployment):
+
+### `ArbixExecutor.sol` — The Trader
+Flash-loan powered multi-DEX arbitrage executor supporting 4 BSC DEXes.
+
+```
+executeCrossDexArbitrage()   → Buy on BiSwap, sell on PancakeSwap in 1 tx
+executeTriangularArbitrage() → USDT→BNB→ETH→USDT on one DEX
+executeFlashArbitrage()      → Borrow $100K from PancakeSwap (no collateral),
+                               arb, repay+fee — all in one atomic transaction.
+                               If unprofitable → entire tx reverts. Max risk: $0.10 gas.
+getBestPrice()               → Query all 4 DEXes, return best router + price
+calculateArbitrageProfit()   → Simulate net profit before executing
+```
+
+**Safety**: circuit breaker (auto-pause on daily loss limit), `minProfitBps` guard, deadline protection, `onlyAgent` modifier locks execution to the AI backend wallet only.
+
+### `ArbixPriceOracle.sol` — The Watcher
+On-chain TWAP calculator + anomaly detector.
+
+```
+getPriceFromDex()     → Read price directly from PancakeSwap/BiSwap pool reserves
+getAggregatedPrice()  → Median of 2 DEXes + spread in basis points
+recordPrice()         → Store price point for TWAP history
+getTWAP()             → Time-weighted average over configurable window (prevents manipulation)
+```
+
+Emits `AnomalyDetected` event on-chain when price deviates >5% from recent TWAP.
+
+### `ArbixVault.sol` — The Bank
+Capital management vault for depositors.
+
+```
+deposit()         → Deposit USDT/BNB into vault (1-hour lock)
+withdraw()        → Withdraw principal + proportional profit share
+fundExecutor()    → Send capital from vault to Executor for trading
+collectProfits()  → Pull profits from Executor back to vault
+```
+
+Non-reentrancy guard, 10% performance fee (capped at 30%), emergency withdraw.
+
+---
+
+## Live API — What's Actually Working Right Now
+
+```bash
+# Real prices from all 5 oracles
+GET /api/prices/matrix
+
+# All pairwise spreads (hard-capped at 10% — no garbage data)
+GET /api/prices/spreads
+
+# Arbitrage opportunities detected this cycle
+GET /api/arbitrage/opportunities
+
+# AI agent status, regime, thresholds
+GET /api/agent/status
+
+# Recent trade decisions with XAI rationale
+GET /api/agent/decisions?limit=10
+
+# Smart contract info + DEX router addresses
+GET /api/contracts
+
+# LIVE: simulate arbitrage profit across 4 DEXes using real on-chain getAmountsOut
+GET /api/contracts/simulate?token_in=USDT&token_out=WBNB&amount=1000
+
+# Real liquidity pool reserves from PancakeSwap + BiSwap
+GET /api/contracts/reserves/USDT/WBNB
+
+# WebSocket: live price stream
+WS /ws/prices
+
+# WebSocket: live spread heatmap
+WS /ws/spreads
+
+# WebSocket: live agent decisions
+WS /ws/agent
+```
+
+### Example — Live Arbitrage Simulation (real on-chain data):
+```bash
+curl 'http://localhost:8000/api/contracts/simulate?token_in=USDT&token_out=WBNB&amount=1000'
+
+# Response:
+{
+  "dex_prices": {
+    "pancakeswap": { "amount_out": 1.6297, "fee": "0.25%" },
+    "biswap":      { "amount_out": 1.6233, "fee": "0.10%" },
+    "babyswap":    { "amount_out": 1.6124, "fee": "0.30%" }
+  },
+  "best_buy": "babyswap",
+  "best_sell": "pancakeswap",
+  "spread_pct": 1.0723,
+  "estimated_profit": 10.72,
+  "profitable": true
+}
+```
+
+---
+
+## Quick Start
 
 ### Prerequisites
-
-```bash
-node >= 18.0.0
-python >= 3.10
-git
+```
+Python 3.10+
+Node.js 18+
 ```
 
-### 1. Clone the Repository
-
+### Backend
 ```bash
-git clone https://github.com/your-org/arbix.git
-cd arbix
-```
-
-### 2. Install Dependencies
-
-```bash
-# Backend
-cd backend
+cd Backend
+python -m venv .venv
+source .venv/bin/activate          # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
+uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+```
 
-# Frontend
-cd ../frontend
+### Frontend
+```bash
+cd Frontend
 npm install
-
-# Smart Contracts
-cd ../contracts
-npm install
+npm run dev -- --port 3001
 ```
 
-### 3. Configure Environment
+Open [http://localhost:3001](http://localhost:3001)
 
-```bash
-cp .env.example .env
-# Edit .env with your API keys and wallet config
-```
-
-### 4. Deploy Contracts (Testnet)
-
-```bash
-cd contracts
-npx hardhat run scripts/deploy.js --network bscTestnet
-```
-
-### 5. Start the Platform
-
-```bash
-# Terminal 1 — Backend API
-cd backend
-uvicorn main:app --reload --port 8000
-
-# Terminal 2 — Frontend Dashboard
-cd frontend
-npm run dev
-```
-
-Open [http://localhost:3000](http://localhost:3000) to access the Arbix dashboard.
-
-<br/>
-
----
-
-## ⚙️ Configuration
-
-Edit `.env` to configure Arbix for your environment:
-
+### Environment (optional — Supabase for persistence)
 ```env
-# ── Exchange Configuration ──────────────────────────────
-BINANCE_API_KEY=your_binance_api_key
-BINANCE_SECRET_KEY=your_binance_secret
-
-# ── Blockchain Configuration ────────────────────────────
-BSC_TESTNET_RPC=https://data-seed-prebsc-1-s1.binance.org:8545
-PRIVATE_KEY=your_wallet_private_key
-CONTRACT_ADDRESS=deployed_contract_address
-
-# ── Trading Parameters ──────────────────────────────────
-MIN_SPREAD_PCT=0.05           # Minimum spread to consider (%)
-MIN_PROFIT_USD=5.00           # Minimum net profit per trade (USD)
-MAX_POSITION_SIZE_USD=1000    # Maximum single trade size
-MAX_DRAWDOWN_PCT=5.0          # Circuit breaker threshold (%)
-
-# ── AI Configuration ────────────────────────────────────
-ML_CONFIDENCE_THRESHOLD=0.78  # Minimum ML score to execute
-RISK_TOLERANCE=medium         # low | medium | high
-
-# ── Mode ────────────────────────────────────────────────
-EXECUTION_MODE=simulation     # simulation | testnet | mainnet
+VITE_SUPABASE_URL=your_supabase_url
+VITE_SUPABASE_ANON_KEY=your_anon_key
 ```
-
-<br/>
 
 ---
 
-## 📊 Dashboard
-
-The Arbix dashboard provides full transparency into agent activity:
+## Project Structure
 
 ```
-┌────────────────────────────────────────────────────────────────┐
-│  ARBIX  |  Live      🟢  |  BNB Testnet  |  Balance: $12,480  │
-├─────────────┬──────────────┬──────────────┬───────────────────┤
-│ Today's P&L │ Trades Today │  Win Rate    │  Active Pairs     │
-│  +$284.50   │     47       │   89.4%      │      12           │
-├─────────────┴──────────────┴──────────────┴───────────────────┤
-│  EQUITY CURVE                                    LIVE TRADES  │
-│  ▲                                           BTC/USDT  +$4.20 │
-│  │    ∧   ∧ ∧                               ETH/USDT  +$2.80 │
-│  │  ∧/ ∧∨/ ∨  ∧                            BNB/USDT  +$1.50 │
-│  │ /           ∨∧                                            │
-│  └──────────────────────▶                                     │
-├───────────────────────────────────────────────────────────────┤
-│  OPPORTUNITY HEATMAP         RECENT TRADE LOG                 │
-│  BTC  ████████░░ 82%        12:04:21 BTC  +$4.20  ✅ Exec    │
-│  ETH  █████░░░░░ 54%        12:03:58 ETH  +$2.80  ✅ Exec    │
-│  BNB  ███░░░░░░░ 31%        12:03:44 SOL  $0.00   ⏭ Skip    │
-└───────────────────────────────────────────────────────────────┘
+Arbix/
+├── Backend/
+│   ├── main.py                 # FastAPI app, 20+ routes, 3 WebSocket endpoints
+│   ├── oracles/
+│   │   ├── binance.py          # Binance REST — 10/10 symbols
+│   │   ├── coingecko.py        # CoinGecko REST — 30s cache, backoff on 429
+│   │   ├── pancakeswap.py      # On-chain eth_call, Binance validation
+│   │   ├── oneinch.py          # BiSwap on-chain eth_call, Binance validation
+│   │   └── jupiter.py          # Pyth Network Hermes, batched 4/req, validated
+│   └── engine/
+│       ├── price_matrix.py     # Parallel oracle fetch, zero-price filtering
+│       ├── arbitrage_graph.py  # Bellman-Ford, direct, triangular, cross-chain
+│       ├── scoring.py          # 5-factor scoring, Kelly Criterion sizing
+│       ├── xai.py              # Explainable AI rationale generation
+│       ├── anomaly.py          # Z-score, divergence, regime classification
+│       ├── portfolio.py        # Deterministic P&L, real cost breakdown
+│       └── agent.py            # Main orchestration loop, adaptive thresholds
+├── Frontend/
+│   └── src/
+│       ├── pages/
+│       │   ├── LandingPage.jsx
+│       │   ├── DashboardPage.jsx    # Live prices, agent status, portfolio
+│       │   ├── CoinsPage.jsx        # Multi-source price comparison table
+│       │   ├── AnalyticsPage.jsx    # Network Graph, spread heatmap
+│       │   ├── AgentPage.jsx        # AI decisions, XAI rationale feed
+│       │   ├── ContractsPage.jsx    # Smart contract explorer + simulator
+│       │   └── SettingsPage.jsx
+│       └── components/
+│           ├── NetworkGraph.jsx     # SVG pentagon oracle visualization
+│           ├── Sidebar.jsx
+│           ├── AnimatedCounter.jsx
+│           ├── LivePriceWidget.jsx
+│           ├── NotificationToast.jsx
+│           └── LandingCards.jsx
+└── Contracts/
+    ├── ArbixExecutor.sol       # Flash-loan multi-DEX arbitrage executor
+    ├── ArbixPriceOracle.sol    # On-chain TWAP + anomaly detection
+    └── ArbixVault.sol          # Capital management vault
 ```
-
-<br/>
 
 ---
 
-## 📈 Performance & Metrics
+## Tech Stack
 
-Arbix tracks the following performance indicators in real time:
-
-| Metric | Description |
+| Layer | Technology |
 |---|---|
-| **Gross P&L** | Total profit before fees across all executed trades |
-| **Net P&L** | Profit after all fees, gas costs, and slippage |
-| **Win Rate** | Percentage of trades that resulted in positive net profit |
-| **Sharpe Ratio** | Risk-adjusted return metric (target: > 2.0) |
-| **Max Drawdown** | Largest peak-to-trough equity decline observed |
-| **Avg Trade Duration** | Time from detection to on-chain confirmation |
-| **Opportunities/Hour** | Rate of qualifying opportunities detected |
-| **Execution Success Rate** | Percentage of attempted trades that confirmed on-chain |
-
-<br/>
+| Backend | Python 3.10, FastAPI, asyncio, httpx |
+| Frontend | React 18, Vite, React Router |
+| Blockchain | Solidity 0.8.19, BSC Mainnet RPC |
+| Oracle | Binance REST, CoinGecko REST, Pyth Hermes, BSC eth_call |
+| Database | Supabase (PostgreSQL) |
+| AI | Custom — Bellman-Ford, Kelly Criterion, Z-score, XAI |
 
 ---
 
-## 🔮 Roadmap
+## Hackathon Context
 
-```
-Q1 2025  ████████████████████  ✅ Core arbitrage engine
-          ████████████████████  ✅ BNB Chain Testnet integration
-          ████████████████████  ✅ Real-time dashboard MVP
+Built for **BNB Chain × YZi Labs Hackathon, Bengaluru 2025**.
 
-Q2 2025  ████████████░░░░░░░░  🔄 Reinforcement learning strategies
-          ██████░░░░░░░░░░░░░░  🔄 Multi-chain support (ETH, Polygon)
-          ████░░░░░░░░░░░░░░░░  🔜 Prediction market integration
-
-Q3 2025  ░░░░░░░░░░░░░░░░░░░░  📋 Institutional liquidity connectors
-          ░░░░░░░░░░░░░░░░░░░░  📋 DAO-governed parameter voting
-          ░░░░░░░░░░░░░░░░░░░░  📋 Strategy NFT marketplace
-
-Q4 2025  ░░░░░░░░░░░░░░░░░░░░  🔭 Fully autonomous hedge fund agent
-          ░░░░░░░░░░░░░░░░░░░░  🔭 Cross-chain atomic arbitrage
-          ░░░░░░░░░░░░░░░░░░░░  🔭 Mainnet production launch
-```
-
-<br/>
+**Theme alignment**: Real-time DeFi intelligence on BNB Chain. Every price comparison involves actual BSC on-chain data. The smart contracts are written specifically for the BNB Chain DEX ecosystem (PancakeSwap V2, BiSwap V2, THENA, BabySwap).
 
 ---
 
-## 🤝 Contributing
+## License
 
-We welcome contributions from the community. Arbix is built in the open, and we believe the best trading intelligence is built collaboratively.
-
-```bash
-# 1. Fork the repository
-# 2. Create your feature branch
-git checkout -b feature/your-feature-name
-
-# 3. Commit your changes
-git commit -m "feat: add cross-exchange triangular arb detection"
-
-# 4. Push to the branch
-git push origin feature/your-feature-name
-
-# 5. Open a Pull Request
-```
-
-Please read our [CONTRIBUTING.md](CONTRIBUTING.md) and [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) before submitting.
-
-**Areas we're actively looking for help:**
-- Additional exchange WebSocket connectors
-- ML model improvements and backtesting frameworks
-- Smart contract gas optimization
-- Mobile dashboard (React Native)
-- Documentation and tutorials
-
-<br/>
-
----
-
-## 🔐 Security
-
-Security is paramount in financial systems. Here's our approach:
-
-- **No mainnet private keys** in any config files or version control
-- **All smart contracts** undergo internal review before testnet deployment  
-- **Rate limiting** applied to all API endpoints
-- **Input validation** on all trade parameters before execution
-- **Circuit breakers** halt all trading on anomaly detection
-
-Found a vulnerability? Please report it responsibly to **security@arbix.io** — do not open public issues for security concerns.
-
-<br/>
-
----
-
-## 📄 License
-
-```
-MIT License
-
-Copyright (c) 2025 Arbix
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software...
-```
-
-See [LICENSE](LICENSE) for the full license text.
-
-<br/>
+MIT © Arbix Team
 
 ---
 
 <div align="center">
 
-**Built with ❤️ by the Arbix Team**
-
-*Democratizing algorithmic finance — one arbitrage at a time.*
-
-<br/>
-
-[![Twitter](https://img.shields.io/badge/Twitter-@ArbixAI-1DA1F2?style=for-the-badge&logo=twitter&logoColor=white)]()
-[![Discord](https://img.shields.io/badge/Discord-Join%20Community-5865F2?style=for-the-badge&logo=discord&logoColor=white)]()
-[![Docs](https://img.shields.io/badge/Docs-docs.arbix.io-orange?style=for-the-badge)]()
-
-<br/>
-
-*⚠️ Arbix is currently in active development on testnet. This is not financial advice. Trading involves significant risk. Never trade with funds you cannot afford to lose.*
+*All prices shown are from real sources. No mocks, no simulated data. On-chain quotes read directly from BSC smart contracts.*
 
 </div>
