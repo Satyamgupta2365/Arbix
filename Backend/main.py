@@ -13,10 +13,12 @@
 ╚══════════════════════════════════════════════════════════════╝
 """
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 import asyncio
 import httpx
 import json
+import math
 import time
 import websockets as ws_client
 from contextlib import asynccontextmanager
@@ -26,6 +28,7 @@ from engine.agent import agent, agent_loop
 from engine.price_matrix import price_matrix
 from engine.arbitrage_graph import arbitrage_detector
 from engine.scoring import scoring_engine
+from engine.ml_scoring import ml_scoring_engine
 from engine.xai import xai_engine
 from engine.portfolio import portfolio_engine
 from engine.anomaly import anomaly_detector
@@ -107,7 +110,32 @@ async def lifespan(app: FastAPI):
     print("🛑 Arbix Backend stopped")
 
 
-app = FastAPI(title="Arbix ArbiNet AI", version="2.0", lifespan=lifespan)
+# ── Safe JSON encoder that replaces inf/nan with null ──
+class SafeJSONResponse(JSONResponse):
+    def render(self, content) -> bytes:
+        return json.dumps(
+            content,
+            ensure_ascii=False,
+            allow_nan=False,
+            default=str,
+            separators=(",", ":"),
+        ).encode("utf-8")
+
+
+def _sanitize(obj):
+    """Recursively replace inf/nan floats with None so JSON doesn't crash."""
+    if isinstance(obj, float):
+        if math.isinf(obj) or math.isnan(obj):
+            return None
+        return obj
+    if isinstance(obj, dict):
+        return {k: _sanitize(v) for k, v in obj.items()}
+    if isinstance(obj, (list, tuple)):
+        return [_sanitize(v) for v in obj]
+    return obj
+
+
+app = FastAPI(title="Arbix ArbiNet AI", version="2.0", lifespan=lifespan, default_response_class=SafeJSONResponse)
 
 app.add_middleware(
     CORSMiddleware,
@@ -164,10 +192,10 @@ async def get_opportunities():
 @app.get("/api/agent/decisions")
 async def get_decisions(limit: int = 50):
     """XAI decision audit trail — full rationale for every decision."""
-    return {
+    return _sanitize({
         "decisions": xai_engine.get_recent_decisions(limit),
         "stats": xai_engine.get_stats(),
-    }
+    })
 
 
 @app.get("/api/agent/decisions/{decision_id}")
@@ -175,7 +203,7 @@ async def get_decision_detail(decision_id: str):
     """Get a specific decision by ID."""
     for d in xai_engine.decisions:
         if d["decision_id"] == decision_id:
-            return d
+            return _sanitize(d)
     return {"error": "Decision not found"}
 
 
@@ -201,6 +229,18 @@ async def get_performance():
 async def get_trades(limit: int = 50):
     """Recent trades with full cost breakdown."""
     return portfolio_engine.get_recent_trades(limit)
+
+
+@app.get("/api/agent/ml-accuracy")
+async def get_ml_accuracy():
+    """ML scoring engine accuracy stats: calibration curve, Brier score, accuracy by tier."""
+    return ml_scoring_engine.get_accuracy_stats()
+
+
+@app.get("/api/agent/calibration-curve")
+async def get_calibration_curve():
+    """Bayesian calibration curve: predicted confidence vs actual accuracy."""
+    return ml_scoring_engine.calibrator.get_calibration_curve()
 
 
 # ── Price Matrix Routes ──
@@ -247,8 +287,11 @@ async def get_market_regime():
 @app.get("/api/market/anomalies")
 async def get_anomalies(limit: int = 30):
     """Recent market anomalies."""
+    all_anomalies = anomaly_detector.anomalies
+    recent = anomaly_detector.get_recent_anomalies(limit)
     return {
-        "anomalies": anomaly_detector.get_recent_anomalies(limit),
+        "anomalies": recent,
+        "total_count": len(all_anomalies),
         "regime": anomaly_detector.get_regime(),
     }
 
@@ -656,6 +699,83 @@ async def get_contracts():
     }
 
 
+@app.post("/api/agent/execute")
+async def manual_execute_trade(body: dict):
+    """Manually execute a detected arbitrage opportunity via the agent."""
+    opp_id = body.get("opportunity_id")
+    if not opp_id:
+        return {"status": "error", "message": "No opportunity_id provided"}
+
+    # Find the opportunity in the detector's current list
+    target_opp = None
+    for opp in arbitrage_detector.opportunities:
+        if opp.id == opp_id:
+            target_opp = opp
+            break
+
+    if not target_opp:
+        return {"status": "queued", "message": f"Opportunity {opp_id} expired — agent will scan for next best"}
+
+    try:
+        # Score through both engines (same pipeline the agent uses)
+        full_matrix = price_matrix.matrix
+        legacy_scoring = scoring_engine.score(target_opp, full_matrix)
+        ml_scoring = ml_scoring_engine.score(target_opp, full_matrix)
+
+        # ML engine is primary scorer
+        scoring = ml_scoring
+        confidence = scoring.get("final_confidence", scoring.get("confidence", 50))
+
+        # Generate XAI rationale (same as agent run_cycle)
+        rationale = xai_engine.generate_rationale(target_opp, scoring, full_matrix)
+
+        # Enrich with ML analysis
+        rationale["ml_analysis"] = {
+            "algorithm_agreement": ml_scoring.get("algorithm_agreement"),
+            "bayesian_calibration": ml_scoring.get("bayesian_calibration"),
+            "volatility_adjustment": ml_scoring.get("volatility_adjustment"),
+            "raw_confidence": ml_scoring.get("raw_confidence"),
+            "legacy_confidence": legacy_scoring.get("confidence"),
+        }
+
+        # Force EXECUTE decision for manual trades (override any HOLD)
+        rationale["decision"] = "EXECUTE"
+
+        # Execute through portfolio engine (expects full rationale dict)
+        trade = portfolio_engine.execute_trade(rationale)
+
+        if trade and isinstance(trade, dict) and trade.get("id"):
+            # Record outcome in ML feedback loop
+            ml_scoring_engine.record_trade_outcome(
+                confidence=confidence,
+                was_profitable=trade.get("won", True),
+            )
+            return {
+                "status": "executed",
+                "opportunity_id": opp_id,
+                "confidence": round(confidence, 1),
+                "trade": {
+                    "symbol": ", ".join(trade.get("symbols", [])),
+                    "pnl": round(trade.get("pnl", 0), 4),
+                    "result": "WIN" if trade.get("won") else "LOSS",
+                    "spread_pct": round(target_opp.net_profit_pct, 4),
+                },
+                "rationale": {
+                    "primary_reason": rationale.get("verdict", "Manual execution"),
+                    "confidence": round(confidence, 1),
+                }
+            }
+        else:
+            return {
+                "status": "blocked",
+                "message": "Trade blocked by circuit breaker or risk limits",
+                "confidence": round(confidence, 1),
+            }
+
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+
 @app.get("/api/contracts/simulate")
 async def simulate_arbitrage(
     token_in: str = "USDT",
@@ -681,7 +801,7 @@ async def simulate_arbitrage(
     addr_out = token_out_addr[2:].lower().zfill(64)
     calldata = selector + amount_hex + offset + array_len + addr_in + addr_out
 
-    results = {}
+    raw_results = {}
     async with httpx.AsyncClient(timeout=10) as client:
         for dex_name, dex_info in DEX_ROUTERS.items():
             try:
@@ -692,18 +812,39 @@ async def simulate_arbitrage(
                 res = await client.post("https://bsc-dataseed1.binance.org", json=payload)
                 data = res.json()
                 result_hex = data.get("result", "0x")
-                if result_hex and len(result_hex) > 66:
+                # getAmountsOut returns ABI-encoded uint256[]: offset(32) + length(32) + elements
+                # For a 2-token path: offset + len(2) + amountIn + amountOut
+                # The output amount is the LAST 32-byte word
+                if result_hex and len(result_hex) > 66 and not data.get("error"):
                     out_hex = result_hex[-64:]
                     out_wei = int(out_hex, 16)
                     decimals_out = BSC_TOKENS[token_out]["decimals"]
                     out_human = out_wei / (10 ** decimals_out)
-                    results[dex_name] = {
+                    raw_results[dex_name] = {
                         "amount_out": round(out_human, 8),
                         "router": dex_info["address"],
                         "fee": dex_info["fee"],
                     }
             except Exception:
                 pass
+
+    # ------- Liquidity sanity filter -------
+    # Use the BEST quote as reference — the DEX with the most liquidity
+    # returns the closest-to-correct output. Any pool returning less than
+    # 10% of the best quote has negligible liquidity and would cause
+    # massive slippage on a real trade. We exclude those from the spread.
+    results = {}
+    if raw_results:
+        best_out = max(v["amount_out"] for v in raw_results.values())
+        for dex_name, info in raw_results.items():
+            out = info["amount_out"]
+            # Skip if output is basically zero
+            if out <= 0:
+                continue
+            # Skip if output is < 10% of the best quote (no real liquidity)
+            if best_out > 0 and out < best_out * 0.10:
+                continue
+            results[dex_name] = info
 
     # Find arbitrage opportunity
     if len(results) >= 2:
@@ -722,9 +863,10 @@ async def simulate_arbitrage(
             "spread_pct": round(spread_pct, 4),
             "estimated_profit": round(spread_pct * amount / 100, 4),
             "profitable": spread_pct > 0.1,
+            "excluded_dexes": {k: v for k, v in raw_results.items() if k not in results},
         }
 
-    return {"token_in": token_in, "token_out": token_out, "dex_prices": results, "profitable": False}
+    return {"token_in": token_in, "token_out": token_out, "dex_prices": results, "profitable": False, "excluded_dexes": {k: v for k, v in raw_results.items() if k not in results}}
 
 
 @app.get("/api/contracts/reserves/{token_a}/{token_b}")

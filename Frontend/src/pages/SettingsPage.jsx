@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import ArbixLogo from '../components/ArbixLogo';
+import Sidebar from '../components/Sidebar';
 
 const API = 'http://localhost:8000';
 
@@ -106,29 +107,7 @@ const SettingsPage = () => {
 
     return (
         <div className="dashboard-layout">
-            {/* Sidebar */}
-            <aside className="sidebar">
-                <div className="sidebar-logo" onClick={() => navigate('/')} style={{ cursor: 'pointer' }}>
-                    <ArbixLogo size="small" />
-                </div>
-                <nav className="sidebar-nav">
-                    <Link to="/dashboard" className="sidebar-link"><LayoutDashboard size={18} /><span>Dashboard</span></Link>
-                    <Link to="/coins" className="sidebar-link"><BarChart3 size={18} /><span>Markets</span></Link>
-                    <Link to="/agent" className="sidebar-link"><Brain size={18} /><span>AI Agent</span></Link>
-                    <Link to="/analytics" className="sidebar-link"><Activity size={18} /><span>Analytics</span></Link>
-                    <Link to="/settings" className="sidebar-link active"><Settings size={18} /><span>Settings</span></Link>
-                </nav>
-                <div className="sidebar-bottom">
-                    <div className="sidebar-link" style={{ cursor: 'default', opacity: 0.7 }}>
-                        <div style={{
-                            width: 8, height: 8, borderRadius: '50%',
-                            background: agentStatus ? '#69f0ae' : '#ff5252',
-                            boxShadow: agentStatus ? '0 0 8px #69f0ae' : '0 0 8px #ff5252',
-                        }} />
-                        <span style={{ fontSize: '0.75rem' }}>{agentStatus?.state || 'Offline'}</span>
-                    </div>
-                </div>
-            </aside>
+            <Sidebar active="settings" />
 
             {/* Main */}
             <main className="dashboard-main" style={{ padding: '1.5rem', overflow: 'auto', flex: 1, minWidth: 0 }}>

@@ -10,6 +10,7 @@ from typing import Dict, List, Optional
 from engine.price_matrix import price_matrix
 from engine.arbitrage_graph import arbitrage_detector
 from engine.scoring import scoring_engine
+from engine.ml_scoring import ml_scoring_engine
 from engine.xai import xai_engine
 from engine.portfolio import portfolio_engine
 from engine.anomaly import anomaly_detector
@@ -43,10 +44,14 @@ class Agent:
         self.errors: List[Dict] = []
         self.subscribers: List = []  # WebSocket subscribers
 
-        # Adaptive thresholds
-        self.min_confidence = 50
+        # Adaptive thresholds (tuned for paper trading — real cost model handles risk)
+        self.min_confidence = 35
         self.min_spread_pct = 0.05
-        self.max_risk = 70
+        self.max_risk = 80
+
+        # Rate limiter — max 1 trade per 30 seconds to stay realistic
+        self.last_trade_time = 0
+        self.trade_cooldown_secs = 30  # 1 trade per 30s max
 
         # Activity log (last N events)
         self.activity_log: List[Dict] = []
@@ -142,8 +147,23 @@ class Agent:
 
             top_opps = opportunities[:10]
             for opp in top_opps:
-                scoring = scoring_engine.score(opp, full_matrix)
+                # Use BOTH engines: legacy for compatibility, ML for advanced scoring
+                legacy_scoring = scoring_engine.score(opp, full_matrix)
+                ml_scoring = ml_scoring_engine.score(opp, full_matrix)
+
+                # The ML engine is the primary scorer now
+                scoring = ml_scoring
                 rationale = xai_engine.generate_rationale(opp, scoring, full_matrix)
+
+                # Enrich rationale with ML-specific data
+                rationale["ml_analysis"] = {
+                    "algorithm_agreement": ml_scoring.get("algorithm_agreement"),
+                    "bayesian_calibration": ml_scoring.get("bayesian_calibration"),
+                    "volatility_adjustment": ml_scoring.get("volatility_adjustment"),
+                    "raw_confidence": ml_scoring.get("raw_confidence"),
+                    "legacy_confidence": legacy_scoring.get("confidence"),
+                }
+
                 cycle_result["decisions"].append(rationale)
 
                 await self._broadcast({
@@ -156,18 +176,30 @@ class Agent:
                     "risk": rationale["risk"],
                     "net_profit": rationale["profit_analysis"]["net_profit"],
                     "verdict": rationale["verdict"],
+                    "ml_analysis": rationale.get("ml_analysis"),
                 })
 
                 # ── Step 5: EXECUTE if criteria met ──
-                if (rationale["decision"] == "EXECUTE" and
+                # Allow execution for EXECUTE decisions, or decent-confidence opportunities
+                is_executable = (rationale["decision"] == "EXECUTE" or
+                                 scoring["confidence"] >= 40)
+                if (is_executable and
                     scoring["confidence"] >= self.min_confidence and
                     scoring["risk"] <= self.max_risk):
+
+                    # Rate limiter: max 1 auto-trade per minute
+                    now = time.time()
+                    if now - self.last_trade_time < self.trade_cooldown_secs:
+                        continue  # Skip — too soon since last trade
 
                     self.state = AgentState.EXECUTING
                     await self._broadcast({"type": "state", "state": self.state})
 
+                    # Ensure decision is EXECUTE for portfolio engine
+                    rationale["decision"] = "EXECUTE"
                     trade = portfolio_engine.execute_trade(rationale)
                     if trade and isinstance(trade, dict) and trade.get("id"):
+                        self.last_trade_time = time.time()  # Update rate limiter
                         cycle_result["trades_executed"] += 1
                         self._log("TRADE_EXECUTED", {
                             "trade_id": trade["id"],
@@ -175,6 +207,12 @@ class Agent:
                             "won": trade["won"],
                         })
                         await self._broadcast({"type": "trade", "trade": trade})
+
+                        # ── FEEDBACK LOOP: teach the ML engine from outcomes ──
+                        ml_scoring_engine.record_trade_outcome(
+                            confidence=scoring["confidence"],
+                            was_profitable=trade["won"],
+                        )
 
         except Exception as e:
             self.state = AgentState.ERROR
@@ -232,6 +270,7 @@ class Agent:
         arb_stats = arbitrage_detector.get_stats()
         xai_stats = xai_engine.get_stats()
         matrix_summary = price_matrix.get_summary()
+        ml_accuracy = ml_scoring_engine.get_accuracy_stats()
 
         uptime = time.time() - self.started_at if self.started_at else 0
         hours = int(uptime // 3600)
@@ -267,6 +306,7 @@ class Agent:
             "detection": arb_stats,
             "decisions": xai_stats,
             "performance": perf,
+            "ml_accuracy": ml_accuracy,
 
             "errors": self.errors[-5:],
             "websocket_subscribers": len(self.subscribers),

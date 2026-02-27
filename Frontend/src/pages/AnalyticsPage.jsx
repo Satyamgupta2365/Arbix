@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import ArbixLogo from '../components/ArbixLogo';
+import Sidebar from '../components/Sidebar';
 import NetworkGraph from '../components/NetworkGraph';
 
 const API = 'http://localhost:8000';
@@ -18,6 +19,7 @@ const AnalyticsPage = () => {
     const [spreads, setSpreads] = useState([]);
     const [regime, setRegime] = useState(null);
     const [anomalies, setAnomalies] = useState([]);
+    const [anomalyTotalCount, setAnomalyTotalCount] = useState(0);
     const [matrix, setMatrix] = useState(null);
     const [decisions, setDecisions] = useState([]);
     const [priceHistory, setPriceHistory] = useState({});
@@ -38,7 +40,7 @@ const AnalyticsPage = () => {
             if (pRes.status === 'fulfilled') setPortfolio(await pRes.value.json());
             if (spRes.status === 'fulfilled') { const d = await spRes.value.json(); setSpreads(d.spreads || []); }
             if (rRes.status === 'fulfilled') setRegime(await rRes.value.json());
-            if (aRes.status === 'fulfilled') { const d = await aRes.value.json(); setAnomalies(d.anomalies || []); }
+            if (aRes.status === 'fulfilled') { const d = await aRes.value.json(); setAnomalies(d.anomalies || []); setAnomalyTotalCount(d.total_count || d.anomalies?.length || 0); }
             if (mRes.status === 'fulfilled') {
                 const raw = await mRes.value.json();
                 // API returns { matrix: { BTCUSDT: { binance: {price,...}, ... }, ... }, summary: { source_status, ... } }
@@ -91,9 +93,14 @@ const AnalyticsPage = () => {
     });
     const maxBucket = Math.max(...Object.values(spreadBuckets), 1);
 
-    // Anomaly severity distribution
+    // Anomaly severity distribution (case-insensitive — API may return HIGH/MODERATE/LOW)
     const anomSeverity = { high: 0, medium: 0, low: 0 };
-    anomalies.forEach(a => { if (anomSeverity[a.severity] !== undefined) anomSeverity[a.severity]++; });
+    anomalies.forEach(a => {
+        const sev = (a.severity || '').toLowerCase();
+        if (sev === 'high') anomSeverity.high++;
+        else if (sev === 'medium' || sev === 'moderate') anomSeverity.medium++;
+        else if (sev === 'low') anomSeverity.low++;
+    });
 
     // Decision confidence histogram
     const confBuckets = Array(10).fill(0); // 0-10, 10-20, ..., 90-100
@@ -117,28 +124,7 @@ const AnalyticsPage = () => {
 
     return (
         <div className="dashboard-layout">
-            {/* ── Sidebar ── */}
-            <aside className="sidebar">
-                <div className="sidebar-logo" onClick={() => navigate('/')} style={{ cursor: 'pointer' }}>
-                    <ArbixLogo size="small" />
-                </div>
-                <nav className="sidebar-nav">
-                    <Link to="/dashboard" className="sidebar-link"><LayoutDashboard size={18} /><span>Dashboard</span></Link>
-                    <Link to="/coins" className="sidebar-link"><BarChart3 size={18} /><span>Markets</span></Link>
-                    <Link to="/agent" className="sidebar-link"><Brain size={18} /><span>AI Agent</span></Link>
-                    <Link to="/analytics" className="sidebar-link active"><Activity size={18} /><span>Analytics</span></Link>
-                </nav>
-                <div className="sidebar-bottom">
-                    <div className="sidebar-link" style={{ cursor: 'default', opacity: 0.7 }}>
-                        <div style={{
-                            width: 8, height: 8, borderRadius: '50%',
-                            background: status ? '#69f0ae' : '#ff5252',
-                            boxShadow: status ? '0 0 8px #69f0ae' : '0 0 8px #ff5252',
-                        }} />
-                        <span style={{ fontSize: '0.75rem' }}>{status ? `${status.scan_count} scans` : 'Offline'}</span>
-                    </div>
-                </div>
-            </aside>
+            <Sidebar active="analytics" />
 
             {/* ── Main ── */}
             <main className="dashboard-main" style={{ padding: '1.5rem', overflow: 'auto', flex: 1, minWidth: 0 }}>
@@ -168,6 +154,77 @@ const AnalyticsPage = () => {
                     </div>
                 </div>
 
+                {/* ── LIVE PROFIT HERO ── */}
+                <motion.div
+                    initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
+                    style={{
+                        background: 'linear-gradient(135deg, rgba(105,240,174,0.06) 0%, rgba(252,213,53,0.04) 50%, rgba(124,77,255,0.06) 100%)',
+                        border: '1px solid rgba(105,240,174,0.12)',
+                        borderRadius: '1rem', padding: '1.5rem 2rem', marginBottom: '1.2rem',
+                        display: 'grid', gridTemplateColumns: '1fr auto', gap: '1.5rem', alignItems: 'center',
+                    }}
+                >
+                    <div>
+                        <div style={{ fontSize: '0.7rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '0.3rem', letterSpacing: '1px' }}>
+                            PORTFOLIO VALUE
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.8rem', flexWrap: 'wrap' }}>
+                            <motion.span
+                                key={perf.balance}
+                                initial={{ scale: 1.1, color: '#FCD535' }}
+                                animate={{ scale: 1, color: '#fff' }}
+                                style={{ fontSize: '2.4rem', fontWeight: 900, fontFamily: 'var(--mono)' }}
+                            >
+                                ${perf.balance?.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || '10,000.00'}
+                            </motion.span>
+                            <span style={{
+                                fontSize: '1.1rem', fontWeight: 800, fontFamily: 'var(--mono)',
+                                color: (perf.total_pnl || 0) >= 0 ? '#69f0ae' : '#ff5252',
+                                display: 'flex', alignItems: 'center', gap: '0.3rem',
+                            }}>
+                                {(perf.total_pnl || 0) >= 0 ? <ArrowUpRight size={18} /> : <ArrowDownRight size={18} />}
+                                {(perf.total_pnl || 0) >= 0 ? '+' : ''}${perf.total_pnl?.toFixed(2) || '0.00'}
+                            </span>
+                        </div>
+                        <div style={{ display: 'flex', gap: '1.5rem', marginTop: '0.8rem', flexWrap: 'wrap' }}>
+                            {[
+                                { label: 'Win Rate', value: perf.win_rate != null ? `${perf.win_rate.toFixed(1)}%` : '—', color: '#69f0ae' },
+                                { label: 'Sharpe', value: perf.sharpe_ratio?.toFixed(2) || '—', color: '#b388ff' },
+                                { label: 'Trades', value: perf.total_trades || '0', color: '#40c4ff' },
+                                { label: 'Max DD', value: perf.max_drawdown_pct != null ? `${perf.max_drawdown_pct.toFixed(2)}%` : '—', color: '#ff5252' },
+                                { label: 'Profit Factor', value: perf.profit_factor?.toFixed(2) || '—', color: '#ffd740' },
+                            ].map((s, i) => (
+                                <div key={i}>
+                                    <div style={{ fontSize: '0.6rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '0.15rem' }}>{s.label}</div>
+                                    <div style={{ fontSize: '1rem', fontWeight: 800, fontFamily: 'var(--mono)', color: s.color }}>{s.value}</div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                    {/* Mini sparkline */}
+                    <div style={{ display: 'flex', alignItems: 'flex-end', gap: '1px', height: '80px', minWidth: '120px' }}>
+                        {equity.length > 0 ? equity.slice(-40).map((e, i) => {
+                            const arr = equity.slice(-40);
+                            const min = Math.min(...arr.map(x => x.balance));
+                            const max = Math.max(...arr.map(x => x.balance));
+                            const range = max - min || 1;
+                            const h = ((e.balance - min) / range) * 70 + 10;
+                            return (
+                                <div key={i} style={{
+                                    flex: 1, height: `${h}px`, borderRadius: '1px 1px 0 0', minWidth: '2px',
+                                    background: e.balance >= 10000
+                                        ? `rgba(105,240,174,${0.3 + (i / 40) * 0.5})`
+                                        : `rgba(255,82,82,${0.3 + (i / 40) * 0.5})`,
+                                }} />
+                            );
+                        }) : (
+                            <div style={{ color: 'var(--text-muted)', fontSize: '0.7rem', alignSelf: 'center', textAlign: 'center', width: '100%' }}>
+                                Collecting data...
+                            </div>
+                        )}
+                    </div>
+                </motion.div>
+
                 {/* ── KPI Strip ── */}
                 <div style={{
                     display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(155px, 1fr))',
@@ -179,7 +236,7 @@ const AnalyticsPage = () => {
                         { label: 'REGIME', value: regime?.regime || '—', color: regimeColors[regime?.regime] || '#fff', icon: <Zap size={14} /> },
                         { label: 'EXEC RATE', value: `${execRate}%`, color: '#b388ff', icon: <Target size={14} /> },
                         { label: 'TOTAL P&L', value: `${(perf.total_pnl || 0) >= 0 ? '+' : ''}$${perf.total_pnl?.toFixed(2) || '0'}`, color: (perf.total_pnl || 0) >= 0 ? '#69f0ae' : '#ff5252', icon: <TrendingUp size={14} /> },
-                        { label: 'ANOMALIES', value: anomalies.length.toString(), color: anomalies.length > 5 ? '#ff5252' : '#ffab40', icon: <Shield size={14} /> },
+                        { label: 'ANOMALIES', value: anomalyTotalCount.toString(), color: anomalyTotalCount > 5 ? '#ff5252' : '#ffab40', icon: <Shield size={14} /> },
                     ].map((kpi, i) => (
                         <motion.div key={i}
                             className="glass-card"
@@ -206,7 +263,7 @@ const AnalyticsPage = () => {
                             <h3 style={{ fontSize: '0.95rem', fontWeight: 800, marginBottom: '0.8rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                                 <Layers size={16} style={{ color: '#FCD535' }} /> Price Source Network
                                 <span style={{ fontSize: '0.7rem', fontWeight: 500, color: 'var(--text-muted)', marginLeft: 'auto' }}>
-                                    {spreads.length} active spreads • {anomalies.length} anomalies
+                                    {spreads.length} active spreads • {anomalyTotalCount} anomalies
                                 </span>
                             </h3>
                             <NetworkGraph spreads={spreads} anomalies={anomalies} regime={regime} />
@@ -258,7 +315,7 @@ const AnalyticsPage = () => {
                                         <div style={{ height: '6px', borderRadius: '3px', background: 'rgba(255,255,255,0.05)' }}>
                                             <motion.div
                                                 initial={{ width: 0 }}
-                                                animate={{ width: `${anomalies.length > 0 ? (sev.count / anomalies.length) * 100 : 0}%` }}
+                                                animate={{ width: `${anomalyTotalCount > 0 ? (sev.count / anomalyTotalCount) * 100 : 0}%` }}
                                                 transition={{ duration: 0.8, delay: i * 0.1 }}
                                                 style={{ height: '100%', borderRadius: '3px', background: sev.color }}
                                             />
@@ -268,18 +325,21 @@ const AnalyticsPage = () => {
                             </div>
                             {/* Latest anomalies */}
                             <div style={{ maxHeight: '150px', overflowY: 'auto' }}>
-                                {anomalies.slice(0, 5).map((a, i) => (
+                                {anomalies.slice(0, 5).map((a, i) => {
+                                    const sev = (a.severity || '').toLowerCase();
+                                    return (
                                     <div key={i} style={{
                                         padding: '0.4rem 0', borderBottom: '1px solid rgba(255,255,255,0.04)',
                                         fontSize: '0.75rem', display: 'flex', justifyContent: 'space-between',
                                     }}>
                                         <span style={{ color: '#fff' }}>{a.symbol?.replace('USDT', '')} — {a.type}</span>
                                         <span style={{
-                                            fontFamily: 'var(--mono)', fontSize: '0.7rem',
-                                            color: a.severity === 'high' ? '#ff1744' : a.severity === 'medium' ? '#ff9100' : '#40c4ff',
+                                            fontFamily: 'var(--mono)', fontSize: '0.7rem', textTransform: 'uppercase',
+                                            color: sev === 'high' ? '#ff1744' : (sev === 'medium' || sev === 'moderate') ? '#ff9100' : '#40c4ff',
                                         }}>{a.severity}</span>
                                     </div>
-                                ))}
+                                    );
+                                })}
                             </div>
                         </div>
                     </div>
@@ -291,27 +351,49 @@ const AnalyticsPage = () => {
                         <div className="glass-card" style={{ padding: '1.2rem', gridColumn: '1 / -1' }}>
                             <h3 style={{ fontSize: '0.95rem', fontWeight: 800, marginBottom: '0.8rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                                 <LineChart size={16} style={{ color: '#69f0ae' }} /> Equity Curve
-                                <span style={{ fontSize: '0.7rem', fontWeight: 500, color: 'var(--text-muted)', marginLeft: 'auto' }}>
+                                <span style={{ fontSize: '0.7rem', fontWeight: 500, color: 'var(--text-muted)', marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                                    {equity.length > 0 && (
+                                        <motion.span
+                                            key={equity[equity.length - 1]?.balance}
+                                            initial={{ opacity: 0, y: -5 }}
+                                            animate={{ opacity: 1, y: 0 }}
+                                            style={{ color: '#69f0ae', fontFamily: 'var(--mono)', fontWeight: 700, fontSize: '0.78rem' }}
+                                        >
+                                            LIVE ${equity[equity.length - 1]?.balance?.toLocaleString(undefined, { maximumFractionDigits: 2 })}
+                                        </motion.span>
+                                    )}
+                                    <span style={{ display: 'inline-block', width: 6, height: 6, borderRadius: '50%', background: '#69f0ae', animation: 'pulse 1.5s infinite' }} />
                                     {equity.length} data points
                                 </span>
                             </h3>
-                            <div style={{ height: '220px', display: 'flex', alignItems: 'flex-end', gap: '1px', padding: '0 0.5rem' }}>
-                                {equity.length > 0 ? equity.slice(-120).map((e, i) => {
+                            <div key={`eq-${equity.length}`} style={{ height: '220px', display: 'flex', alignItems: 'flex-end', gap: '1px', padding: '0 0.5rem' }}>
+                                {equity.length > 0 ? (() => {
                                     const arr = equity.slice(-120);
                                     const min = Math.min(...arr.map(x => x.balance));
                                     const max = Math.max(...arr.map(x => x.balance));
                                     const range = max - min || 1;
+                                    const total = arr.length;
+                                    return arr.map((e, i) => {
                                     const h = ((e.balance - min) / range) * 200;
                                     const isUp = e.balance >= 10000;
+                                    const isNewest = i >= total - 3;
                                     return (
-                                        <div key={i} style={{
-                                            flex: 1, height: `${h}px`, borderRadius: '1px 1px 0 0', minWidth: '1px',
-                                            background: isUp
-                                                ? `rgba(105,240,174,${0.3 + (h / 200) * 0.5})`
-                                                : `rgba(255,82,82,${0.3 + (h / 200) * 0.5})`,
+                                        <motion.div key={`${i}-${e.balance}`}
+                                            initial={{ height: 0, opacity: 0.5 }}
+                                            animate={{ height: `${h}px`, opacity: 1 }}
+                                            transition={{ duration: 0.5, delay: i * 0.002 }}
+                                            style={{
+                                            flex: 1, borderRadius: '1px 1px 0 0', minWidth: '1px',
+                                            background: isNewest
+                                                ? (isUp ? 'rgba(105,240,174,0.95)' : 'rgba(255,82,82,0.95)')
+                                                : isUp
+                                                    ? `rgba(105,240,174,${0.2 + (i / total) * 0.5})`
+                                                    : `rgba(255,82,82,${0.2 + (i / total) * 0.5})`,
+                                            boxShadow: isNewest ? '0 0 6px rgba(105,240,174,0.5)' : 'none',
                                         }} title={`$${e.balance.toFixed(2)}`} />
                                     );
-                                }) : (
+                                    });
+                                })() : (
                                     <div style={{ color: 'var(--text-muted)', textAlign: 'center', width: '100%', alignSelf: 'center' }}>
                                         No equity data yet
                                     </div>
@@ -386,15 +468,16 @@ const AnalyticsPage = () => {
                                 <Server size={16} style={{ color: '#40c4ff' }} /> Oracle Source Health
                             </h3>
                             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '0.8rem' }}>
-                                {['binance', 'coingecko', 'pancakeswap', 'jupiter', 'oneinch'].map((src, i) => {
+                                {['binance', 'coingecko', 'pancakeswap', 'jupiter', '1inch'].map((src, i) => {
                                     const coverage = coverageEntries[src];
                                     const symbolsCovered = coverage ? Object.values(coverage).filter(Boolean).length : 0;
                                     const isOnline = symbolsCovered > 0;
                                     const coveragePct = symbolCount > 0 ? ((symbolsCovered / symbolCount) * 100).toFixed(0) : 0;
                                     const srcColors = {
                                         binance: '#F0B90B', coingecko: '#8DC63F', pancakeswap: '#D1884F',
-                                        jupiter: '#C7F284', oneinch: '#94A3B8',
+                                        jupiter: '#C7F284', '1inch': '#94A3B8',
                                     };
+                                    const displayName = src === '1inch' ? 'Oneinch' : src;
                                     return (
                                         <motion.div key={src}
                                             initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}
@@ -409,7 +492,7 @@ const AnalyticsPage = () => {
                                                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                                                     {isOnline ? <Wifi size={14} style={{ color: '#69f0ae' }} /> : <WifiOff size={14} style={{ color: '#ff5252' }} />}
                                                     <span style={{ fontWeight: 800, fontSize: '0.85rem', textTransform: 'capitalize', color: srcColors[src] || '#fff' }}>
-                                                        {src}
+                                                        {displayName}
                                                     </span>
                                                 </div>
                                                 <span style={{

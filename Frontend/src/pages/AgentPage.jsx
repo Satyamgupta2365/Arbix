@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import ArbixLogo from '../components/ArbixLogo';
+import Sidebar from '../components/Sidebar';
 
 const API = 'http://localhost:8000';
 
@@ -21,12 +22,13 @@ const AgentPage = () => {
     const [activity, setActivity] = useState([]);
     const [wsConnected, setWsConnected] = useState(false);
     const [activeTab, setActiveTab] = useState('overview');
+    const [mlAccuracy, setMlAccuracy] = useState(null);
     const wsRef = useRef(null);
 
     // ── Fetch all data ──
     const fetchAll = async () => {
         try {
-            const [statusRes, oppsRes, decsRes, portRes, spreadRes, regimeRes, anomRes, actRes] = await Promise.allSettled([
+            const [statusRes, oppsRes, decsRes, portRes, spreadRes, regimeRes, anomRes, actRes, mlRes] = await Promise.allSettled([
                 fetch(`${API}/api/agent/status`),
                 fetch(`${API}/api/agent/opportunities`),
                 fetch(`${API}/api/agent/decisions?limit=30`),
@@ -35,6 +37,7 @@ const AgentPage = () => {
                 fetch(`${API}/api/market/regime`),
                 fetch(`${API}/api/market/anomalies?limit=20`),
                 fetch(`${API}/api/agent/activity?limit=40`),
+                fetch(`${API}/api/agent/ml-accuracy`),
             ]);
             if (statusRes.status === 'fulfilled') setAgentStatus(await statusRes.value.json());
             if (oppsRes.status === 'fulfilled') { const d = await oppsRes.value.json(); setOpportunities(d.opportunities || []); }
@@ -44,6 +47,7 @@ const AgentPage = () => {
             if (regimeRes.status === 'fulfilled') setRegime(await regimeRes.value.json());
             if (anomRes.status === 'fulfilled') { const d = await anomRes.value.json(); setAnomalies(d.anomalies || []); }
             if (actRes.status === 'fulfilled') setActivity(await actRes.value.json());
+            if (mlRes.status === 'fulfilled') setMlAccuracy(await mlRes.value.json());
         } catch (e) { console.error('Fetch error', e); }
     };
 
@@ -111,28 +115,7 @@ const AgentPage = () => {
 
     return (
         <div className="dashboard-layout">
-            {/* ── Sidebar ── */}
-            <aside className="sidebar">
-                <div className="sidebar-logo" onClick={() => navigate('/')} style={{ cursor: 'pointer' }}>
-                    <ArbixLogo size="small" />
-                </div>
-                <nav className="sidebar-nav">
-                    <Link to="/dashboard" className="sidebar-link"><LayoutDashboard size={18} /><span>Dashboard</span></Link>
-                    <Link to="/coins" className="sidebar-link"><BarChart3 size={18} /><span>Markets</span></Link>
-                    <Link to="/agent" className="sidebar-link active"><Brain size={18} /><span>AI Agent</span></Link>
-                    <Link to="/analytics" className="sidebar-link"><Activity size={18} /><span>Analytics</span></Link>
-                </nav>
-                <div className="sidebar-bottom">
-                    <div className="sidebar-link" style={{ cursor: 'default', opacity: 0.7 }}>
-                        <div style={{
-                            width: 8, height: 8, borderRadius: '50%',
-                            background: wsConnected ? '#69f0ae' : '#ff5252',
-                            boxShadow: wsConnected ? '0 0 8px #69f0ae' : '0 0 8px #ff5252',
-                        }} />
-                        <span style={{ fontSize: '0.75rem' }}>{wsConnected ? 'Agent Live' : 'Connecting...'}</span>
-                    </div>
-                </div>
-            </aside>
+            <Sidebar active="agent" />
 
             {/* ── Main Content ── */}
             <main className="dashboard-main" style={{ padding: '1.5rem', overflow: 'auto', flex: 1, minWidth: 0 }}>
@@ -148,14 +131,14 @@ const AgentPage = () => {
                         </p>
                     </div>
                     <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-                        {['overview', 'opportunities', 'decisions', 'portfolio'].map(tab => (
+                        {['overview', 'opportunities', 'decisions', 'ml-intel', 'portfolio'].map(tab => (
                             <button key={tab} onClick={() => setActiveTab(tab)} style={{
                                 padding: '0.5rem 1rem', borderRadius: '0.5rem', border: 'none',
                                 background: activeTab === tab ? '#FCD535' : 'var(--card-bg)',
                                 color: activeTab === tab ? '#000' : 'var(--text-secondary)',
                                 fontWeight: 700, fontSize: '0.8rem', cursor: 'pointer',
                                 textTransform: 'capitalize',
-                            }}>{tab}</button>
+                            }}>{tab === 'ml-intel' ? '🧠 ML Intel' : tab}</button>
                         ))}
                     </div>
                 </div>
@@ -218,6 +201,7 @@ const AgentPage = () => {
                 {activeTab === 'overview' && <OverviewTab activity={activity} spreads={spreads} anomalies={anomalies} />}
                 {activeTab === 'opportunities' && <OpportunitiesTab opportunities={opportunities} />}
                 {activeTab === 'decisions' && <DecisionsTab decisions={decisions} />}
+                {activeTab === 'ml-intel' && <MLIntelTab mlAccuracy={mlAccuracy} agentStatus={agentStatus} decisions={decisions} />}
                 {activeTab === 'portfolio' && <PortfolioTab perf={perf} equity={equity} trades={trades} />}
             </main>
         </div>
@@ -311,20 +295,23 @@ const OverviewTab = ({ activity, spreads, anomalies }) => (
                 <Shield size={16} style={{ color: '#ff5252' }} /> Anomaly Detection
             </h3>
             <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap' }}>
-                {anomalies.slice(0, 10).map((a, i) => (
+                {anomalies.slice(0, 10).map((a, i) => {
+                    const sev = (a.severity || '').toLowerCase();
+                    return (
                     <div key={i} style={{
                         padding: '0.6rem 0.9rem', borderRadius: '0.5rem',
-                        background: a.severity === 'high' ? 'rgba(255,23,68,0.12)' :
-                                    a.severity === 'medium' ? 'rgba(255,171,64,0.12)' : 'rgba(64,196,255,0.12)',
-                        border: `1px solid ${a.severity === 'high' ? 'rgba(255,23,68,0.3)' :
-                                              a.severity === 'medium' ? 'rgba(255,171,64,0.3)' : 'rgba(64,196,255,0.3)'}`,
+                        background: sev === 'high' ? 'rgba(255,23,68,0.12)' :
+                                    (sev === 'medium' || sev === 'moderate') ? 'rgba(255,171,64,0.12)' : 'rgba(64,196,255,0.12)',
+                        border: `1px solid ${sev === 'high' ? 'rgba(255,23,68,0.3)' :
+                                              (sev === 'medium' || sev === 'moderate') ? 'rgba(255,171,64,0.3)' : 'rgba(64,196,255,0.3)'}`,
                     }}>
                         <div style={{ fontWeight: 700, fontSize: '0.8rem' }}>{a.symbol?.replace('USDT', '')} — {a.type}</div>
                         <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '0.2rem' }}>
                             {a.description?.slice(0, 80) || `z-score: ${a.z_score?.toFixed(2)}`}
                         </div>
                     </div>
-                ))}
+                    );
+                })}
                 {anomalies.length === 0 && (
                     <div style={{ color: 'var(--text-muted)', fontSize: '0.85rem', padding: '1rem' }}>
                         No anomalies detected — market is calm.
@@ -339,16 +326,75 @@ const OverviewTab = ({ activity, spreads, anomalies }) => (
 // TAB: OPPORTUNITIES
 // ═══════════════════════════════════════════════════════
 
-const OpportunitiesTab = ({ opportunities }) => (
+const OpportunitiesTab = ({ opportunities }) => {
+    const [executing, setExecuting] = useState(null);
+    const [execResult, setExecResult] = useState(null);
+
+    const executeOpp = async (opp) => {
+        setExecuting(opp.id);
+        setExecResult(null);
+        try {
+            const res = await fetch(`${API}/api/agent/execute`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ opportunity_id: opp.id }),
+            });
+            const data = await res.json();
+            setExecResult({ id: opp.id, ...data });
+        } catch (e) {
+            setExecResult({ id: opp.id, status: 'error', message: e.message });
+        }
+        setTimeout(() => setExecuting(null), 1000);
+    };
+
+    return (
     <div className="glass-card" style={{ padding: '1.2rem' }}>
         <h3 style={{ fontSize: '0.95rem', fontWeight: 800, marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
             <Target size={16} style={{ color: '#ffd740' }} /> Detected Arbitrage Opportunities ({opportunities.length})
         </h3>
+
+        {/* Execution result banner */}
+        {execResult && (
+            <motion.div
+                initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}
+                style={{
+                    padding: '0.8rem 1rem', borderRadius: '0.5rem', marginBottom: '1rem',
+                    background: execResult.status === 'executed' ? 'rgba(105,240,174,0.1)' : 'rgba(255,171,64,0.1)',
+                    border: `1px solid ${execResult.status === 'executed' ? 'rgba(105,240,174,0.3)' : 'rgba(255,171,64,0.3)'}`,
+                    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                }}
+            >
+                <div>
+                    <span style={{
+                        fontWeight: 800, fontSize: '0.85rem',
+                        color: execResult.status === 'executed' ? '#69f0ae' : '#ffab40',
+                    }}>
+                        {execResult.status === 'executed' ? '✅ Trade Executed' : `⚡ ${execResult.status || 'Processed'}`}
+                    </span>
+                    {execResult.trade && (
+                        <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginLeft: '0.8rem' }}>
+                            P&L: <strong style={{ color: (execResult.trade.pnl || 0) >= 0 ? '#69f0ae' : '#ff5252' }}>
+                                {execResult.trade.pnl >= 0 ? '+' : ''}${execResult.trade.pnl?.toFixed(2)}
+                            </strong> • {execResult.trade.symbol}
+                        </span>
+                    )}
+                    {execResult.message && (
+                        <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginLeft: '0.8rem' }}>
+                            {execResult.message}
+                        </span>
+                    )}
+                </div>
+                <button onClick={() => setExecResult(null)} style={{
+                    background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: '1rem',
+                }}>×</button>
+            </motion.div>
+        )}
+
         <div style={{ overflowX: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8rem' }}>
                 <thead>
                     <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
-                        {['#', 'Type', 'Pair', 'Buy @', 'Sell @', 'Gross %', 'Net %', 'Route', 'Time'].map(h => (
+                        {['#', 'Type', 'Pair', 'Buy @', 'Sell @', 'Gross %', 'Net %', 'Route', 'Time', ''].map(h => (
                             <th key={h} style={{ padding: '0.6rem 0.5rem', textAlign: 'left', color: 'var(--text-muted)', fontWeight: 600 }}>{h}</th>
                         ))}
                     </tr>
@@ -358,6 +404,8 @@ const OpportunitiesTab = ({ opportunities }) => (
                         const buyStep = o.path?.find(p => p.action === 'BUY');
                         const sellStep = o.path?.find(p => p.action === 'SELL');
                         const sym = (o.symbols || []).map(s => s.replace('USDT', '')).join('/');
+                        const isProfitable = (o.net_profit_pct || 0) > 0;
+                        const isExec = executing === o.id;
                         return (
                         <tr key={o.id || i} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
                             <td style={{ padding: '0.6rem 0.5rem', fontFamily: 'var(--mono)', fontSize: '0.7rem' }}>{o.id?.split('-').pop()}</td>
@@ -389,6 +437,22 @@ const OpportunitiesTab = ({ opportunities }) => (
                             <td style={{ padding: '0.6rem 0.5rem', fontSize: '0.7rem', fontFamily: 'var(--mono)', color: 'var(--text-muted)' }}>
                                 {o.timestamp ? new Date(o.timestamp * 1000).toLocaleTimeString() : ''}
                             </td>
+                            <td style={{ padding: '0.6rem 0.3rem' }}>
+                                {isProfitable && (
+                                    <button
+                                        onClick={() => executeOpp(o)}
+                                        disabled={isExec}
+                                        style={{
+                                            padding: '0.3rem 0.7rem', borderRadius: '0.4rem', border: 'none',
+                                            background: isExec ? 'rgba(252,213,53,0.3)' : 'linear-gradient(135deg, #FCD535, #f0b90b)',
+                                            color: '#000', fontWeight: 800, fontSize: '0.65rem', cursor: isExec ? 'wait' : 'pointer',
+                                            display: 'flex', alignItems: 'center', gap: '0.3rem', whiteSpace: 'nowrap',
+                                        }}
+                                    >
+                                        <Zap size={10} /> {isExec ? 'Executing...' : 'Execute'}
+                                    </button>
+                                )}
+                            </td>
                         </tr>
                         );
                     })}
@@ -402,7 +466,8 @@ const OpportunitiesTab = ({ opportunities }) => (
             )}
         </div>
     </div>
-);
+    );
+};
 
 // ═══════════════════════════════════════════════════════
 // TAB: DECISIONS  (FIXED: risk_factors is an object, not array)
@@ -466,6 +531,37 @@ const DecisionsTab = ({ decisions }) => (
                         <span>Size: <strong style={{ fontFamily: 'var(--mono)', color: '#b388ff' }}>{d.position_sizing?.recommended_size_usd || '—'}</strong></span>
                     </div>
 
+                    {/* ML Analysis Badge */}
+                    {d.ml_analysis && (
+                        <div style={{ display: 'flex', gap: '0.6rem', marginBottom: '0.5rem', flexWrap: 'wrap' }}>
+                            {d.ml_analysis.algorithm_agreement && (
+                                <span style={{
+                                    padding: '0.15rem 0.5rem', borderRadius: '0.3rem', fontSize: '0.65rem', fontWeight: 700,
+                                    background: d.ml_analysis.algorithm_agreement.agreement_pct > 60 ? 'rgba(105,240,174,0.15)' : 'rgba(255,171,64,0.15)',
+                                    color: d.ml_analysis.algorithm_agreement.agreement_pct > 60 ? '#69f0ae' : '#ffab40',
+                                }}>
+                                    🧠 {d.ml_analysis.algorithm_agreement.bullish_models}/{d.ml_analysis.algorithm_agreement.total_models} models agree ({d.ml_analysis.algorithm_agreement.agreement_pct}%)
+                                </span>
+                            )}
+                            {d.ml_analysis.bayesian_calibration && (
+                                <span style={{
+                                    padding: '0.15rem 0.5rem', borderRadius: '0.3rem', fontSize: '0.65rem', fontWeight: 700,
+                                    background: 'rgba(64,196,255,0.12)', color: '#40c4ff',
+                                }}>
+                                    📊 Bayesian: {d.ml_analysis.bayesian_calibration.raw_input?.toFixed(0)} → {d.ml_analysis.bayesian_calibration.calibrated_output?.toFixed(0)}
+                                </span>
+                            )}
+                            {d.ml_analysis.raw_confidence != null && d.ml_analysis.legacy_confidence != null && (
+                                <span style={{
+                                    padding: '0.15rem 0.5rem', borderRadius: '0.3rem', fontSize: '0.65rem', fontWeight: 700,
+                                    background: 'rgba(179,136,255,0.12)', color: '#b388ff',
+                                }}>
+                                    Legacy: {d.ml_analysis.legacy_confidence} vs ML: {d.ml_analysis.raw_confidence?.toFixed(0)}
+                                </span>
+                            )}
+                        </div>
+                    )}
+
                     {/* Execution Path + Reasoning */}
                     {d.execution_path && d.execution_path.length > 0 && (
                         <div style={{
@@ -499,6 +595,219 @@ const DecisionsTab = ({ decisions }) => (
         </div>
     </div>
 );
+
+// ═══════════════════════════════════════════════════════
+// TAB: ML INTELLIGENCE
+// ═══════════════════════════════════════════════════════
+
+const MLIntelTab = ({ mlAccuracy, agentStatus, decisions }) => {
+    const calibration = mlAccuracy?.calibration_curve || [];
+    const accuracyTiers = mlAccuracy?.accuracy_by_confidence || [];
+    const brierScore = mlAccuracy?.brier_score;
+    const totalPredictions = mlAccuracy?.total_predictions || 0;
+    const totalScored = mlAccuracy?.total_scored || 0;
+    const ensembleWeights = mlAccuracy?.ensemble_weights || {};
+    const mlStatus = agentStatus?.ml_accuracy || {};
+
+    // Algorithm descriptions for the info panel
+    const algorithms = [
+        { name: 'Z-Score Spread Analysis', icon: '📊', weight: ensembleWeights.spread_strength, desc: 'Statistical significance of spread vs rolling 200-point history. Higher z-score = more unusual = more likely real.' },
+        { name: 'Profitability Assessment', icon: '💰', weight: ensembleWeights.profitability, desc: 'Net profit after all costs (gas, slippage, execution decay). Tiered scoring from THIN (0.05%) to EXCEPTIONAL (>1%).' },
+        { name: 'EMA Crossover (MACD)', icon: '📈', weight: ensembleWeights.ema_signal, desc: 'Dual exponential moving average crossover (12/26). BULLISH = spread widening (opportunity), BEARISH = spread closing (danger).' },
+        { name: 'Ornstein-Uhlenbeck Half-Life', icon: '⏱️', weight: ensembleWeights.half_life, desc: 'Models spread as mean-reverting process. Calculates how many seconds until spread closes to half its value. Ideal: 30-120s.' },
+        { name: 'ADF Stationarity Test', icon: '🔬', weight: ensembleWeights.mean_reversion, desc: 'Augmented Dickey-Fuller inspired test. Stationary spread = mean-reverting = capturable. Non-stationary = random walk = dangerous.' },
+        { name: 'Source Consensus', icon: '🔗', weight: ensembleWeights.source_consensus, desc: 'Multi-oracle agreement analysis. 5 sources agreeing = high confidence. Wild disagreement = possible data error.' },
+        { name: 'Data Freshness', icon: '⚡', weight: ensembleWeights.data_freshness, desc: 'Timestamp recency of price data. Real-time (<2s) = maximum score. Stale (>30s) = spread may have already closed.' },
+        { name: 'Volume/Liquidity Depth', icon: '🌊', weight: ensembleWeights.volume, desc: '24h trading volume across sources. Deep liquidity (>$1B) = can execute without moving price. Thin = high slippage risk.' },
+    ];
+
+    // Get the most recent decision's sub-model breakdown for live display
+    const latestDecision = decisions.find(d => d?.ml_analysis);
+    const latestBreakdown = latestDecision?.reasoning?.confidence_factors || {};
+
+    return (
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+
+            {/* ── Bayesian Calibration Curve ── */}
+            <div className="glass-card" style={{ padding: '1.2rem' }}>
+                <h3 style={{ fontSize: '0.95rem', fontWeight: 800, marginBottom: '0.3rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <Brain size={16} style={{ color: '#40c4ff' }} /> Bayesian Confidence Calibration
+                </h3>
+                <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginBottom: '1rem' }}>
+                    Self-correcting: if we predict 80% but only win 60%, future 80% predictions are adjusted down.
+                </p>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                    {calibration.map((c, i) => {
+                        const predicted = c.predicted_confidence;
+                        const actual = c.actual_accuracy;
+                        const posterior = c.bayesian_posterior;
+                        const hasData = c.sample_size > 0;
+                        return (
+                            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                                <span style={{ width: '40px', fontSize: '0.7rem', fontFamily: 'var(--mono)', color: 'var(--text-muted)', textAlign: 'right' }}>
+                                    {predicted.toFixed(0)}%
+                                </span>
+                                <div style={{ flex: 1, height: '20px', background: 'rgba(255,255,255,0.05)', borderRadius: '4px', position: 'relative', overflow: 'hidden' }}>
+                                    {/* Predicted bar (gray) */}
+                                    <div style={{
+                                        position: 'absolute', height: '100%', width: `${predicted}%`,
+                                        background: 'rgba(255,255,255,0.08)', borderRadius: '4px',
+                                    }} />
+                                    {/* Actual bar (colored) */}
+                                    {hasData && (
+                                        <div style={{
+                                            position: 'absolute', height: '100%', width: `${actual}%`,
+                                            background: Math.abs(actual - predicted) < 15
+                                                ? 'rgba(105,240,174,0.4)' : 'rgba(255,82,82,0.4)',
+                                            borderRadius: '4px',
+                                        }} />
+                                    )}
+                                    {/* Posterior marker */}
+                                    <div style={{
+                                        position: 'absolute', height: '100%', width: '3px', left: `${posterior}%`,
+                                        background: '#FCD535', borderRadius: '2px',
+                                    }} />
+                                </div>
+                                <span style={{ width: '60px', fontSize: '0.65rem', fontFamily: 'var(--mono)', color: hasData ? '#fff' : 'var(--text-muted)' }}>
+                                    {hasData ? `${actual.toFixed(0)}% (${c.sample_size})` : 'no data'}
+                                </span>
+                            </div>
+                        );
+                    })}
+                </div>
+                <div style={{ marginTop: '0.8rem', display: 'flex', gap: '1rem', fontSize: '0.7rem' }}>
+                    <span style={{ color: 'var(--text-muted)' }}>
+                        <span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: 2, background: 'rgba(105,240,174,0.4)', marginRight: 4 }} />
+                        Actual accuracy
+                    </span>
+                    <span style={{ color: 'var(--text-muted)' }}>
+                        <span style={{ display: 'inline-block', width: 8, height: 3, background: '#FCD535', marginRight: 4 }} />
+                        Bayesian posterior
+                    </span>
+                </div>
+            </div>
+
+            {/* ── Accuracy by Confidence Tier ── */}
+            <div className="glass-card" style={{ padding: '1.2rem' }}>
+                <h3 style={{ fontSize: '0.95rem', fontWeight: 800, marginBottom: '0.3rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <Target size={16} style={{ color: '#69f0ae' }} /> Accuracy by Confidence Tier
+                </h3>
+                <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginBottom: '1rem' }}>
+                    How often each confidence range actually wins. Perfect calibration: 80% confidence → 80% win rate.
+                </p>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+                    {accuracyTiers.map((tier, i) => (
+                        <div key={i} style={{
+                            padding: '0.7rem', borderRadius: '0.5rem',
+                            background: 'rgba(255,255,255,0.03)',
+                            display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                        }}>
+                            <div>
+                                <span style={{ fontWeight: 700, fontSize: '0.85rem' }}>{tier.tier}%</span>
+                                <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', marginLeft: '0.5rem' }}>
+                                    ({tier.sample_size} trades)
+                                </span>
+                            </div>
+                            <div style={{ textAlign: 'right' }}>
+                                {tier.accuracy != null ? (
+                                    <span style={{
+                                        fontSize: '1.1rem', fontWeight: 800, fontFamily: 'var(--mono)',
+                                        color: tier.accuracy > 65 ? '#69f0ae' : tier.accuracy > 45 ? '#ffd740' : '#ff5252',
+                                    }}>{tier.accuracy.toFixed(1)}%</span>
+                                ) : (
+                                    <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>—</span>
+                                )}
+                            </div>
+                        </div>
+                    ))}
+                </div>
+                <div style={{ marginTop: '1rem', display: 'flex', gap: '1.5rem' }}>
+                    <div style={{ padding: '0.6rem', borderRadius: '0.5rem', background: 'rgba(64,196,255,0.08)', flex: 1 }}>
+                        <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', fontWeight: 600 }}>BRIER SCORE</div>
+                        <div style={{ fontSize: '1.1rem', fontWeight: 800, fontFamily: 'var(--mono)', color: '#40c4ff' }}>
+                            {brierScore != null ? brierScore.toFixed(4) : '—'}
+                        </div>
+                        <div style={{ fontSize: '0.6rem', color: 'var(--text-muted)' }}>0 = perfect, 0.25 = random</div>
+                    </div>
+                    <div style={{ padding: '0.6rem', borderRadius: '0.5rem', background: 'rgba(179,136,255,0.08)', flex: 1 }}>
+                        <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', fontWeight: 600 }}>TOTAL SCORED</div>
+                        <div style={{ fontSize: '1.1rem', fontWeight: 800, fontFamily: 'var(--mono)', color: '#b388ff' }}>
+                            {totalScored.toLocaleString()}
+                        </div>
+                        <div style={{ fontSize: '0.6rem', color: 'var(--text-muted)' }}>{totalPredictions} with outcomes</div>
+                    </div>
+                </div>
+            </div>
+
+            {/* ── Ensemble Algorithm Breakdown ── full width */}
+            <div className="glass-card" style={{ padding: '1.2rem', gridColumn: '1 / -1' }}>
+                <h3 style={{ fontSize: '0.95rem', fontWeight: 800, marginBottom: '0.3rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    🧠 Ensemble Algorithm Breakdown
+                </h3>
+                <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginBottom: '1rem' }}>
+                    8 sub-models vote on every opportunity. Final confidence = weighted average × volatility adjustment × Bayesian calibration.
+                </p>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '0.6rem' }}>
+                    {algorithms.map((algo, i) => (
+                        <div key={i} style={{
+                            padding: '0.8rem', borderRadius: '0.5rem',
+                            background: 'rgba(255,255,255,0.03)',
+                            border: '1px solid rgba(255,255,255,0.06)',
+                        }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.3rem' }}>
+                                <span style={{ fontWeight: 700, fontSize: '0.82rem' }}>{algo.icon} {algo.name}</span>
+                                <span style={{
+                                    padding: '0.1rem 0.4rem', borderRadius: '0.3rem', fontSize: '0.65rem',
+                                    fontWeight: 800, fontFamily: 'var(--mono)',
+                                    background: 'rgba(252,213,53,0.12)', color: '#FCD535',
+                                }}>
+                                    {algo.weight != null ? `${(algo.weight * 100).toFixed(0)}%` : '—'} weight
+                                </span>
+                            </div>
+                            <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', lineHeight: 1.5 }}>
+                                {algo.desc}
+                            </div>
+                            {/* Weight bar */}
+                            <div style={{ marginTop: '0.4rem', height: '4px', background: 'rgba(255,255,255,0.06)', borderRadius: '2px' }}>
+                                <div style={{
+                                    height: '100%', width: `${(algo.weight || 0) * 500}%`,
+                                    background: 'linear-gradient(90deg, #FCD535, #40c4ff)',
+                                    borderRadius: '2px',
+                                }} />
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            </div>
+
+            {/* ── How It Works Explainer ── full width */}
+            <div className="glass-card" style={{ padding: '1.2rem', gridColumn: '1 / -1' }}>
+                <h3 style={{ fontSize: '0.95rem', fontWeight: 800, marginBottom: '0.8rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    📐 How Confidence Is Calculated
+                </h3>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '0.8rem' }}>
+                    {[
+                        { step: '1', title: '8 Sub-Models Score', desc: 'Each algorithm independently scores the opportunity 0-100', color: '#40c4ff' },
+                        { step: '2', title: 'Weighted Ensemble', desc: 'Scores are combined using optimized weights (20% spread, 15% profit, 15% mean-reversion...)', color: '#b388ff' },
+                        { step: '3', title: 'Volatility Adjust', desc: 'High volatility penalizes confidence (30% penalty at >150% ann. vol)', color: '#ffd740' },
+                        { step: '4', title: 'Bayesian Calibrate', desc: 'Self-corrects based on historical accuracy at each confidence level', color: '#69f0ae' },
+                        { step: '5', title: 'Kelly Position Size', desc: 'f* = (p·b - q)/b — optimal bet size given win probability and payoff ratio', color: '#ff5252' },
+                    ].map((s, i) => (
+                        <div key={i} style={{
+                            padding: '0.8rem', borderRadius: '0.5rem',
+                            background: 'rgba(0,0,0,0.3)',
+                            borderLeft: `3px solid ${s.color}`,
+                        }}>
+                            <div style={{ fontSize: '0.65rem', fontWeight: 800, color: s.color, marginBottom: '0.3rem' }}>STEP {s.step}</div>
+                            <div style={{ fontWeight: 700, fontSize: '0.82rem', marginBottom: '0.2rem' }}>{s.title}</div>
+                            <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', lineHeight: 1.4 }}>{s.desc}</div>
+                        </div>
+                    ))}
+                </div>
+            </div>
+        </div>
+    );
+};
 
 // ═══════════════════════════════════════════════════════
 // TAB: PORTFOLIO

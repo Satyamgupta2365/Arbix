@@ -33,9 +33,9 @@ const Sidebar = ({ active = 'dashboard', topCoins = [], selectedCoin, onSelectCo
                     </Link>
                 ))}
                 {active === 'dashboard' && (
-                    <a href="#" className="sidebar-link">
+                    <Link to="/agent" className="sidebar-link">
                         <Target size={18} /> Opportunities
-                    </a>
+                    </Link>
                 )}
             </nav>
 
@@ -43,12 +43,12 @@ const Sidebar = ({ active = 'dashboard', topCoins = [], selectedCoin, onSelectCo
                 <>
                     <div className="sidebar-section-label">Account</div>
                     <nav className="sidebar-nav">
-                        <a href="#" className="sidebar-link">
+                        <Link to="/analytics" className="sidebar-link">
                             <Wallet size={18} /> Portfolio
-                        </a>
-                        <a href="#" className="sidebar-link">
+                        </Link>
+                        <Link to="/settings" className="sidebar-link">
                             <Settings size={18} /> Settings
-                        </a>
+                        </Link>
                     </nav>
                 </>
             )}

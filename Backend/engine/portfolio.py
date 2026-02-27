@@ -9,14 +9,16 @@ the spread, the trade loses. This reflects real arbitrage economics.
 """
 import time
 import math
+import random
 from typing import Dict, List, Optional
 from collections import defaultdict
 
-# Real-world arbitrage cost model
-SLIPPAGE_PCT = 0.05        # 5 bps average slippage on DEX swaps
-GAS_COST_USD = 0.10        # BSC average gas cost per swap (~$0.05-0.15)
-EXECUTION_DELAY_DECAY = 0.02  # 2 bps price decay per second of execution delay
-AVG_EXECUTION_SECS = 2.0   # Average time to execute an arb (2 blocks on BSC)
+# Real-world arbitrage cost model (BSC DEX realistic)
+SLIPPAGE_PCT = 0.15        # 15 bps average slippage on DEX swaps (multi-hop)
+GAS_COST_USD = 0.25        # BSC gas for multi-hop swap (~$0.15-0.35)
+EXECUTION_DELAY_DECAY = 0.08  # 8 bps price decay per second (volatile markets)
+AVG_EXECUTION_SECS = 3.0   # Average time to execute an arb (3 blocks on BSC)
+SPREAD_DECAY_FACTOR = 0.35  # ~35% of detected spread is capturable (MEV, latency, others arb first)
 
 
 class Trade:
@@ -40,16 +42,24 @@ class Trade:
         self.timestamp = time.time()
 
         # ── Deterministic P&L based on real spread economics ──
-        # Gross profit from the spread
-        gross_pnl = position_size * net_profit_pct / 100
+        # Spread decays by the time we execute (MEV bots, other arbers, price movement)
+        effective_profit_pct = net_profit_pct * SPREAD_DECAY_FACTOR
+
+        # Gross profit from the effective (reduced) spread
+        gross_pnl = position_size * effective_profit_pct / 100
 
         # Real cost deductions
         slippage_cost = position_size * SLIPPAGE_PCT / 100
         execution_decay = position_size * (EXECUTION_DELAY_DECAY * AVG_EXECUTION_SECS) / 100
         total_costs = slippage_cost + GAS_COST_USD + execution_decay
 
-        # Net P&L after all real costs
-        self.pnl = round(gross_pnl - total_costs, 4)
+        # Market noise: real execution uncertainty (±35% of gross)
+        # Models partial fills, MEV frontrunning, liquidity depth, price impact
+        noise_factor = random.gauss(1.0, 0.35)  # mean=1.0, std=35%
+        noise_factor = max(0.1, min(2.0, noise_factor))  # clamp
+
+        # Net P&L after all real costs and market noise
+        self.pnl = round((gross_pnl * noise_factor) - total_costs, 4)
 
         # Win/loss is deterministic: profitable after costs = win
         self.won = self.pnl > 0
@@ -61,6 +71,7 @@ class Trade:
             "gas": GAS_COST_USD,
             "execution_decay": round(execution_decay, 4),
             "total_costs": round(total_costs, 4),
+            "market_noise_factor": round(noise_factor, 3),
             "net_pnl": round(self.pnl, 4),
         }
 

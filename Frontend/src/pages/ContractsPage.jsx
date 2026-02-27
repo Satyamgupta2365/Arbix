@@ -66,9 +66,9 @@ const ContractsPage = () => {
     const tokens = contracts?.tokens ? Object.keys(contracts.tokens) : ['USDT', 'WBNB', 'BUSD', 'BTCB', 'ETH', 'USDC'];
 
     return (
-        <div style={{ display: 'flex', minHeight: '100vh', background: '#07070a' }}>
+        <div className="dashboard-layout">
             <Sidebar active="contracts" />
-            <main style={{ flex: 1, marginLeft: 240, padding: '2rem 2.5rem' }}>
+            <main className="dashboard-main" style={{ padding: '1.5rem', overflow: 'auto', flex: 1, minWidth: 0 }}>
                 {/* Header */}
                 <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} style={{ marginBottom: '2rem' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '0.5rem' }}>
@@ -402,7 +402,7 @@ const ContractsPage = () => {
                     {/* Simulation Results */}
                     {simulation && (
                         <div>
-                            {/* DEX Prices Grid */}
+                            {/* DEX Prices Grid — valid quotes */}
                             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '0.75rem', marginBottom: '1rem' }}>
                                 {simulation.dex_prices && Object.entries(simulation.dex_prices).map(([dex, info]) => (
                                     <div key={dex} style={{
@@ -433,39 +433,80 @@ const ContractsPage = () => {
                                 ))}
                             </div>
 
+                            {/* Excluded DEXes — low liquidity */}
+                            {simulation.excluded_dexes && Object.keys(simulation.excluded_dexes).length > 0 && (
+                                <div style={{
+                                    background: 'rgba(255,152,0,0.04)',
+                                    border: '1px solid rgba(255,152,0,0.12)',
+                                    borderRadius: '10px',
+                                    padding: '10px 14px',
+                                    marginBottom: '1rem',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '0.6rem',
+                                }}>
+                                    <AlertTriangle size={14} color="#FF9800" />
+                                    <span style={{ color: '#FF9800', fontSize: '0.75rem', fontWeight: 600 }}>
+                                        Low Liquidity:
+                                    </span>
+                                    <span style={{ color: '#888', fontSize: '0.75rem' }}>
+                                        {Object.entries(simulation.excluded_dexes).map(([dex, info]) =>
+                                            `${dex} (${info.amount_out?.toFixed(4)} ${tokenOut})`
+                                        ).join(', ')} — excluded from spread calculation
+                                    </span>
+                                </div>
+                            )}
+
                             {/* Opportunity Summary */}
-                            <div style={{
-                                background: simulation.profitable ? 'rgba(0,230,118,0.05)' : 'rgba(255,152,0,0.05)',
-                                border: `1px solid ${simulation.profitable ? 'rgba(0,230,118,0.15)' : 'rgba(255,152,0,0.15)'}`,
-                                borderRadius: '10px',
-                                padding: '14px 18px',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'space-between',
-                            }}>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                                    {simulation.profitable ?
-                                        <CheckCircle2 size={20} color="#00E676" /> :
-                                        <AlertTriangle size={20} color="#FF9800" />
-                                    }
-                                    <div>
-                                        <div style={{ color: '#fff', fontWeight: 700, fontSize: '0.9rem' }}>
-                                            {simulation.profitable ? 'Arbitrage Opportunity Detected' : 'No Profitable Opportunity'}
+                            {simulation.best_buy && simulation.best_sell ? (
+                                <div style={{
+                                    background: simulation.profitable ? 'rgba(0,230,118,0.05)' : 'rgba(255,152,0,0.05)',
+                                    border: `1px solid ${simulation.profitable ? 'rgba(0,230,118,0.15)' : 'rgba(255,152,0,0.15)'}`,
+                                    borderRadius: '10px',
+                                    padding: '14px 18px',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'space-between',
+                                }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                                        {simulation.profitable ?
+                                            <CheckCircle2 size={20} color="#00E676" /> :
+                                            <AlertTriangle size={20} color="#FF9800" />
+                                        }
+                                        <div>
+                                            <div style={{ color: '#fff', fontWeight: 700, fontSize: '0.9rem' }}>
+                                                {simulation.profitable ? 'Arbitrage Opportunity Detected' : 'No Profitable Opportunity'}
+                                            </div>
+                                            <div style={{ color: '#888', fontSize: '0.8rem' }}>
+                                                Buy on <strong style={{ color: '#FF5252' }}>{simulation.best_buy}</strong> → Sell on <strong style={{ color: '#00E676' }}>{simulation.best_sell}</strong>
+                                            </div>
                                         </div>
-                                        <div style={{ color: '#888', fontSize: '0.8rem' }}>
-                                            Buy on <strong style={{ color: '#FF5252' }}>{simulation.best_buy}</strong> → Sell on <strong style={{ color: '#00E676' }}>{simulation.best_sell}</strong>
+                                    </div>
+                                    <div style={{ textAlign: 'right' }}>
+                                        <div style={{ color: simulation.profitable ? '#00E676' : '#FF9800', fontSize: '1.2rem', fontWeight: 700 }}>
+                                            {simulation.spread_pct?.toFixed(4)}%
+                                        </div>
+                                        <div style={{ color: '#888', fontSize: '0.75rem' }}>
+                                            Est. profit: ${simulation.estimated_profit?.toFixed(4)}
                                         </div>
                                     </div>
                                 </div>
-                                <div style={{ textAlign: 'right' }}>
-                                    <div style={{ color: simulation.profitable ? '#00E676' : '#FF9800', fontSize: '1.2rem', fontWeight: 700 }}>
-                                        {simulation.spread_pct?.toFixed(4)}%
-                                    </div>
-                                    <div style={{ color: '#888', fontSize: '0.75rem' }}>
-                                        Est. profit: ${simulation.estimated_profit?.toFixed(4)}
+                            ) : (
+                                <div style={{
+                                    background: 'rgba(255,82,82,0.05)',
+                                    border: '1px solid rgba(255,82,82,0.15)',
+                                    borderRadius: '10px',
+                                    padding: '14px 18px',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '0.75rem',
+                                }}>
+                                    <AlertTriangle size={20} color="#FF5252" />
+                                    <div style={{ color: '#FF5252', fontWeight: 700, fontSize: '0.9rem' }}>
+                                        Insufficient DEX quotes — not enough pools with liquidity for this pair
                                     </div>
                                 </div>
-                            </div>
+                            )}
                         </div>
                     )}
                 </motion.div>

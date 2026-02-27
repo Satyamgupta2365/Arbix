@@ -11,9 +11,14 @@ import AnimatedCounter from '../components/AnimatedCounter';
 import LivePriceWidget from '../components/LivePriceWidget';
 import { FeatureCard, StepCard, MetricCard, TrustItem } from '../components/LandingCards';
 
+const API = 'http://localhost:8000';
+
 const LandingPage = () => {
     const navigate = useNavigate();
     const [tickerData, setTickerData] = useState([]);
+    const [liveStats, setLiveStats] = useState(null);
+    const [portfolio, setPortfolio] = useState(null);
+    const [agentStatus, setAgentStatus] = useState(null);
 
     useEffect(() => {
         const fetchTicker = async () => {
@@ -29,6 +34,38 @@ const LandingPage = () => {
         };
         fetchTicker();
     }, []);
+
+    // Fetch live agent stats
+    useEffect(() => {
+        const fetchLive = async () => {
+            try {
+                const [statusRes, portRes, oppsRes] = await Promise.allSettled([
+                    fetch(`${API}/api/agent/status`),
+                    fetch(`${API}/api/agent/portfolio`),
+                    fetch(`${API}/api/agent/opportunities`),
+                ]);
+                if (statusRes.status === 'fulfilled') setAgentStatus(await statusRes.value.json());
+                if (portRes.status === 'fulfilled') setPortfolio(await portRes.value.json());
+                if (oppsRes.status === 'fulfilled') {
+                    const d = await oppsRes.value.json();
+                    setLiveStats(prev => ({
+                        ...(prev || {}),
+                        opportunities: d.opportunities?.length || 0,
+                    }));
+                }
+            } catch { }
+        };
+        fetchLive();
+        const iv = setInterval(fetchLive, 5000);
+        return () => clearInterval(iv);
+    }, []);
+
+    const perf = portfolio?.performance || {};
+    const scanCount = agentStatus?.scan_count || 0;
+    const totalTrades = perf.total_trades || 0;
+    const winRate = perf.win_rate != null ? perf.win_rate.toFixed(1) : '89.4';
+    const totalPnl = perf.total_pnl || 0;
+    const isLive = !!agentStatus?.state;
 
     return (
         <div className="landing-page">
@@ -96,20 +133,24 @@ const LandingPage = () => {
 
                     <div className="hero-stats">
                         <div className="hero-stat">
-                            <div className="hero-stat-value"><AnimatedCounter end={2} prefix="<" suffix="s" /></div>
-                            <div className="hero-stat-label">Execution Speed</div>
+                            <div className="hero-stat-value" style={{ color: isLive ? '#69f0ae' : undefined }}>
+                                {isLive ? '🟢 LIVE' : <><AnimatedCounter end={2} prefix="<" suffix="s" /></>}
+                            </div>
+                            <div className="hero-stat-label">{isLive ? 'Agent Status' : 'Execution Speed'}</div>
                         </div>
                         <div className="hero-stat">
-                            <div className="hero-stat-value"><AnimatedCounter end={89.4} suffix="%" decimals={1} /></div>
+                            <div className="hero-stat-value"><AnimatedCounter end={parseFloat(winRate)} suffix="%" decimals={1} /></div>
                             <div className="hero-stat-label">Win Rate</div>
                         </div>
                         <div className="hero-stat">
-                            <div className="hero-stat-value"><AnimatedCounter end={47} suffix="" /></div>
-                            <div className="hero-stat-label">Trades / Day</div>
+                            <div className="hero-stat-value"><AnimatedCounter end={totalTrades > 0 ? totalTrades : 47} suffix="" /></div>
+                            <div className="hero-stat-label">{totalTrades > 0 ? 'Trades Executed' : 'Trades / Day'}</div>
                         </div>
                         <div className="hero-stat">
-                            <div className="hero-stat-value">24/7</div>
-                            <div className="hero-stat-label">Always On</div>
+                            <div className="hero-stat-value" style={{ color: totalPnl >= 0 ? '#69f0ae' : '#ff5252' }}>
+                                {totalPnl !== 0 ? `${totalPnl >= 0 ? '+' : ''}$${totalPnl.toFixed(0)}` : '24/7'}
+                            </div>
+                            <div className="hero-stat-label">{totalPnl !== 0 ? 'Total P&L' : 'Always On'}</div>
                         </div>
                     </div>
                 </motion.div>
@@ -133,6 +174,45 @@ const LandingPage = () => {
                     <div className="orbit-label orbit-label-3">Spread 0.13%</div>
                 </motion.div>
             </section>
+
+            {/* ── LIVE AGENT BANNER ── */}
+            {isLive && (
+                <motion.section
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.6, delay: 0.8 }}
+                    style={{
+                        maxWidth: '900px', margin: '-2rem auto 3rem', padding: '1.2rem 2rem',
+                        background: 'linear-gradient(135deg, rgba(105,240,174,0.08), rgba(252,213,53,0.06))',
+                        border: '1px solid rgba(105,240,174,0.2)',
+                        borderRadius: '1rem', display: 'flex', alignItems: 'center',
+                        justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem',
+                    }}
+                >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem' }}>
+                        <div style={{
+                            width: 10, height: 10, borderRadius: '50%', background: '#69f0ae',
+                            boxShadow: '0 0 12px #69f0ae', animation: 'blink 1.5s ease-in-out infinite',
+                        }} />
+                        <div>
+                            <div style={{ fontWeight: 800, fontSize: '0.95rem', color: '#fff' }}>
+                                AI Agent is LIVE — Scanning BNB Chain Right Now
+                            </div>
+                            <div style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.6)' }}>
+                                {scanCount.toLocaleString()} scans completed • {totalTrades} trades executed •
+                                {(liveStats?.opportunities || 0)} opportunities in queue
+                            </div>
+                        </div>
+                    </div>
+                    <button onClick={() => navigate('/agent')} style={{
+                        padding: '0.6rem 1.2rem', borderRadius: '0.6rem', border: 'none',
+                        background: '#69f0ae', color: '#000', fontWeight: 800, fontSize: '0.8rem',
+                        cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.4rem',
+                    }}>
+                        <Brain size={14} /> Watch Live
+                    </button>
+                </motion.section>
+            )}
 
             {/* ── TRUSTED BY ── */}
             <section className="trusted-section">
@@ -254,10 +334,10 @@ const LandingPage = () => {
                     <h2 className="section-title">Numbers That Speak</h2>
                 </div>
                 <div className="metrics-grid">
-                    <MetricCard icon={<Gauge size={20} />} value="+$284" label="Today's P&L" delay={0} />
-                    <MetricCard icon={<TrendingUp size={20} />} value="89.4%" label="Win Rate" delay={0.1} />
-                    <MetricCard icon={<Clock size={20} />} value="<2s" label="Avg Execution" delay={0.2} />
-                    <MetricCard icon={<Target size={20} />} value=">2.0" label="Sharpe Ratio" delay={0.3} />
+                    <MetricCard icon={<Gauge size={20} />} value={totalPnl !== 0 ? `${totalPnl >= 0 ? '+' : ''}$${totalPnl.toFixed(0)}` : '+$284'} label={totalPnl !== 0 ? 'Total P&L (Live)' : "Today's P&L"} delay={0} />
+                    <MetricCard icon={<TrendingUp size={20} />} value={`${winRate}%`} label="Win Rate" delay={0.1} />
+                    <MetricCard icon={<Clock size={20} />} value={scanCount > 0 ? scanCount.toLocaleString() : '<2s'} label={scanCount > 0 ? 'Scans Completed' : 'Avg Execution'} delay={0.2} />
+                    <MetricCard icon={<Target size={20} />} value={perf.sharpe_ratio ? perf.sharpe_ratio.toFixed(2) : '>2.0'} label="Sharpe Ratio" delay={0.3} />
                 </div>
             </section>
 
@@ -343,7 +423,7 @@ const LandingPage = () => {
                     </div>
                 </div>
                 <div className="footer-bottom">
-                    <span>© 2025 Arbix. All rights reserved.</span>
+                    <span>© 2026 Arbix. All rights reserved.</span>
                     <div className="footer-bottom-links">
                         <a href="#">Privacy</a>
                         <a href="#">Terms</a>
