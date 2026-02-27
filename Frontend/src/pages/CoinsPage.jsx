@@ -1,6 +1,7 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { RefreshCw, TrendingUp, TrendingDown, ArrowRight, Zap, Eye, X, BarChart3, Activity, Layers, Search } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { createChart, ColorType } from 'lightweight-charts';
 import Sidebar from '../components/Sidebar';
 
 const API = 'http://localhost:8000';
@@ -28,6 +29,12 @@ const CoinsPage = () => {
     const [spreads, setSpreads] = useState([]);
     const [searchQuery, setSearchQuery] = useState('');
     const [viewMode, setViewMode] = useState('grid');
+    const [modalChartType, setModalChartType] = useState('area');
+    const [modalInterval, setModalInterval] = useState('5m');
+    const [modalChartLoading, setModalChartLoading] = useState(false);
+    const modalChartContainerRef = useRef();
+    const modalChartRef = useRef();
+    const modalSeriesRef = useRef();
 
     useEffect(() => {
         const fetchHotCoins = async () => {
@@ -72,6 +79,134 @@ const CoinsPage = () => {
             setMultiPrices(null);
         }
     };
+
+    // Build chart inside modal when selectedCoin, chartType, or interval changes
+    useEffect(() => {
+        if (!selectedCoin || !modalChartContainerRef.current) return;
+
+        // Small delay to let the modal DOM render
+        const timer = setTimeout(() => {
+            if (!modalChartContainerRef.current) return;
+
+            // Destroy old chart
+            if (modalChartRef.current) {
+                try { modalChartRef.current.remove(); } catch (e) { }
+                modalChartRef.current = null;
+                modalSeriesRef.current = null;
+            }
+
+            const container = modalChartContainerRef.current;
+            let chart;
+            try {
+                chart = createChart(container, {
+                    layout: { background: { type: ColorType.Solid, color: '#111118' }, textColor: '#5a5a6e' },
+                    grid: { vertLines: { color: 'rgba(255,255,255,0.02)' }, horzLines: { color: 'rgba(255,255,255,0.02)' } },
+                    width: container.clientWidth,
+                    height: 280,
+                    timeScale: { timeVisible: true, secondsVisible: false, borderColor: 'rgba(255,255,255,0.05)' },
+                    rightPriceScale: { borderColor: 'rgba(255,255,255,0.05)' },
+                    crosshair: {
+                        vertLine: { color: 'rgba(252,213,53,0.3)', labelBackgroundColor: '#FCD535' },
+                        horzLine: { color: 'rgba(252,213,53,0.3)', labelBackgroundColor: '#FCD535' },
+                    },
+                });
+            } catch (e) {
+                console.error('Modal chart error:', e);
+                return;
+            }
+
+            let series;
+            if (modalChartType === 'candlestick') {
+                series = chart.addCandlestickSeries({
+                    upColor: '#00e676',
+                    downColor: '#ff1744',
+                    borderUpColor: '#00e676',
+                    borderDownColor: '#ff1744',
+                    wickUpColor: '#00e676',
+                    wickDownColor: '#ff1744',
+                });
+            } else {
+                series = chart.addAreaSeries({
+                    lineColor: '#FCD535',
+                    topColor: 'rgba(252, 213, 53, 0.15)',
+                    bottomColor: 'rgba(252, 213, 53, 0)',
+                    lineWidth: 2,
+                });
+            }
+
+            modalSeriesRef.current = series;
+            modalChartRef.current = chart;
+
+            // Fetch 24h data
+            const cType = modalChartType;
+            setModalChartLoading(true);
+
+            const loadData = async () => {
+                const offset = 5.5 * 3600; // IST offset
+                try {
+                    const res = await fetch(`${API}/api/prices/chart/${selectedCoin}?interval=${modalInterval}&hours=24`);
+                    const data = await res.json();
+                    if (data && data.klines && data.klines.length > 0 && series) {
+                        if (cType === 'candlestick') {
+                            series.setData(data.klines.map(k => ({
+                                time: Math.floor(k.time / 1000) + offset,
+                                open: k.open, high: k.high, low: k.low, close: k.close,
+                            })));
+                        } else {
+                            series.setData(data.klines.map(k => ({
+                                time: Math.floor(k.time / 1000) + offset,
+                                value: k.close,
+                            })));
+                        }
+                    }
+                } catch (err) {
+                    console.error('Modal chart fetch error, using Binance fallback:', err);
+                    try {
+                        const res = await fetch(`https://api.binance.com/api/v3/klines?symbol=${selectedCoin}&interval=${modalInterval}&limit=288`);
+                        const data = await res.json();
+                        if (Array.isArray(data) && series) {
+                            if (cType === 'candlestick') {
+                                series.setData(data.map(d => ({
+                                    time: Math.floor(d[0] / 1000) + offset,
+                                    open: parseFloat(d[1]), high: parseFloat(d[2]),
+                                    low: parseFloat(d[3]), close: parseFloat(d[4]),
+                                })));
+                            } else {
+                                series.setData(data.map(d => ({
+                                    time: Math.floor(d[0] / 1000) + offset,
+                                    value: parseFloat(d[4]),
+                                })));
+                            }
+                        }
+                    } catch (e2) {
+                        console.error('Modal chart fallback error:', e2);
+                    }
+                }
+                setModalChartLoading(false);
+            };
+            loadData();
+
+            const handleResize = () => {
+                if (container && chart) {
+                    try { chart.applyOptions({ width: container.clientWidth }); } catch (e) { }
+                }
+            };
+            window.addEventListener('resize', handleResize);
+
+            return () => {
+                window.removeEventListener('resize', handleResize);
+            };
+        }, 100);
+
+        return () => {
+            clearTimeout(timer);
+            if (modalChartRef.current) {
+                try { modalChartRef.current.remove(); } catch (e) { }
+                modalChartRef.current = null;
+                modalSeriesRef.current = null;
+            }
+        };
+    }, [selectedCoin, modalChartType, modalInterval]);
 
     const filteredCoins = hotCoins.filter(c =>
         c.symbol.toLowerCase().includes(searchQuery.toLowerCase())
@@ -316,8 +451,8 @@ const CoinsPage = () => {
                                 onClick={e => e.stopPropagation()}
                                 style={{
                                     background: 'var(--bg-card)', borderRadius: '1rem',
-                                    border: '1px solid var(--border)', width: '100%', maxWidth: '560px',
-                                    padding: '1.5rem', position: 'relative',
+                                    border: '1px solid var(--border)', width: '100%', maxWidth: '720px',
+                                    padding: '1.5rem', position: 'relative', maxHeight: '90vh', overflowY: 'auto',
                                     boxShadow: '0 25px 80px rgba(0,0,0,0.6)',
                                 }}
                             >
@@ -338,6 +473,47 @@ const CoinsPage = () => {
                                     }}>
                                         <X size={16} />
                                     </button>
+                                </div>
+
+                                {/* ═══ 24H CHART ═══ */}
+                                <div style={{
+                                    marginBottom: '1rem', background: '#111118',
+                                    borderRadius: '0.6rem', border: '1px solid var(--border)',
+                                    overflow: 'hidden',
+                                }}>
+                                    {/* Chart toolbar */}
+                                    <div style={{
+                                        display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                                        padding: '0.5rem 0.8rem', borderBottom: '1px solid rgba(255,255,255,0.04)',
+                                    }}>
+                                        <div style={{ display: 'flex', gap: '0.3rem' }}>
+                                            {['area', 'candlestick'].map(ct => (
+                                                <button key={ct} onClick={() => setModalChartType(ct)} style={{
+                                                    padding: '0.25rem 0.55rem', borderRadius: '0.3rem', border: 'none',
+                                                    background: modalChartType === ct ? 'rgba(252,213,53,0.15)' : 'transparent',
+                                                    color: modalChartType === ct ? '#FCD535' : 'var(--text-muted)',
+                                                    fontWeight: 700, fontSize: '0.68rem', cursor: 'pointer',
+                                                    textTransform: 'capitalize',
+                                                }}>{ct}</button>
+                                            ))}
+                                        </div>
+                                        <div style={{ display: 'flex', gap: '0.25rem', alignItems: 'center' }}>
+                                            {modalChartLoading && (
+                                                <span style={{ fontSize: '0.62rem', color: '#FCD535', marginRight: '0.3rem' }}>Loading 24h...</span>
+                                            )}
+                                            {['1m', '5m', '15m', '1h', '4h'].map(tf => (
+                                                <button key={tf} onClick={() => setModalInterval(tf)} style={{
+                                                    padding: '0.2rem 0.45rem', borderRadius: '0.25rem', border: 'none',
+                                                    background: modalInterval === tf ? 'rgba(252,213,53,0.15)' : 'transparent',
+                                                    color: modalInterval === tf ? '#FCD535' : 'var(--text-muted)',
+                                                    fontWeight: 600, fontSize: '0.65rem', cursor: 'pointer',
+                                                }}>{tf}</button>
+                                            ))}
+                                            <span style={{ fontSize: '0.58rem', color: 'var(--text-muted)', marginLeft: '0.3rem' }}>24h</span>
+                                        </div>
+                                    </div>
+                                    {/* Chart container */}
+                                    <div ref={modalChartContainerRef} style={{ width: '100%', minHeight: 280 }} />
                                 </div>
 
                                 {/* Prices from all sources */}
