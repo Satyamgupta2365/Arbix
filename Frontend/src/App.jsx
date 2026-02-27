@@ -1014,34 +1014,29 @@ const DashboardPage = () => {
         }
     };
 
-    const fetchHistory = async (symbol) => {
+    const fetchHistory = async (symbol, type) => {
+        const currentType = type || chartType;
         try {
-            // Try fetching 24h kline data from our backend database first
-            let loaded = false;
-            try {
-                const dbRes = await fetch(`http://localhost:8000/api/klines/${symbol}`);
-                const dbData = await dbRes.json();
-                if (Array.isArray(dbData) && dbData.length > 10) {
-                    const offset = getTzOffsetSeconds();
-                    const formatted = dbData.map(d => ({
-                        time: Math.floor(d.open_time / 1000) + offset,
-                        value: d.close_price
+            // Fetch 24h data from Binance (5m interval = 288 candles for 24h)
+            const res = await fetch(`https://api.binance.com/api/v3/klines?symbol=${symbol}&interval=5m&limit=288`);
+            const data = await res.json();
+            if (Array.isArray(data) && seriesRef.current) {
+                const offset = getTzOffsetSeconds();
+                if (currentType === 'candlestick') {
+                    const formatted = data.map(d => ({
+                        time: Math.floor(d[0] / 1000) + offset,
+                        open: parseFloat(d[1]),
+                        high: parseFloat(d[2]),
+                        low: parseFloat(d[3]),
+                        close: parseFloat(d[4])
                     }));
-                    if (seriesRef.current) seriesRef.current.setData(formatted);
-                    loaded = true;
-                }
-            } catch (e) {
-                console.log('DB kline fetch failed, using Binance API fallback:', e);
-            }
-
-            // Fallback: fetch 24h data directly from Binance (5m interval = 288 candles)
-            if (!loaded) {
-                const res = await fetch(`https://api.binance.com/api/v3/klines?symbol=${symbol}&interval=5m&limit=288`);
-                const data = await res.json();
-                if (Array.isArray(data)) {
-                    const offset = getTzOffsetSeconds();
-                    const formatted = data.map(d => ({ time: Math.floor(d[0] / 1000) + offset, value: parseFloat(d[4]) }));
-                    if (seriesRef.current) seriesRef.current.setData(formatted);
+                    seriesRef.current.setData(formatted);
+                } else {
+                    const formatted = data.map(d => ({
+                        time: Math.floor(d[0] / 1000) + offset,
+                        value: parseFloat(d[4])
+                    }));
+                    seriesRef.current.setData(formatted);
                 }
             }
         } catch (err) {
@@ -1051,7 +1046,7 @@ const DashboardPage = () => {
 
     useEffect(() => {
         if (!selectedCoin) return;
-        fetchHistory(selectedCoin);
+        fetchHistory(selectedCoin, chartType);
 
         wsRef.current = new WebSocket(`ws://localhost:8000/ws/trading/${selectedCoin}`);
         wsRef.current.onmessage = (event) => {
@@ -1059,14 +1054,26 @@ const DashboardPage = () => {
             if (!payload.error) {
                 setMarketData(payload);
                 if (seriesRef.current) {
-                    seriesRef.current.update({ time: Math.floor(Date.now() / 1000) + getTzOffsetSeconds(), value: parseFloat(payload.price) });
+                    const now = Math.floor(Date.now() / 1000) + getTzOffsetSeconds();
+                    const price = parseFloat(payload.price);
+                    if (chartType === 'candlestick') {
+                        seriesRef.current.update({
+                            time: now,
+                            open: price,
+                            high: price,
+                            low: price,
+                            close: price
+                        });
+                    } else {
+                        seriesRef.current.update({ time: now, value: price });
+                    }
                 }
             } else {
                 setSelectedCoin('BTCUSDT');
             }
         };
         return () => { if (wsRef.current) wsRef.current.close(); };
-    }, [selectedCoin, timezone]);
+    }, [selectedCoin, timezone, chartType]);
 
     useEffect(() => {
         if (!chartContainerRef.current) return;
@@ -1076,7 +1083,7 @@ const DashboardPage = () => {
             grid: { vertLines: { color: 'rgba(255,255,255,0.02)' }, horzLines: { color: 'rgba(255,255,255,0.02)' } },
             width: chartContainerRef.current.clientWidth,
             height: 400,
-            timeScale: { timeVisible: true, secondsVisible: true, borderColor: 'rgba(255,255,255,0.05)' },
+            timeScale: { timeVisible: true, secondsVisible: false, borderColor: 'rgba(255,255,255,0.05)' },
             rightPriceScale: { borderColor: 'rgba(255,255,255,0.05)' },
             crosshair: {
                 vertLine: { color: 'rgba(252,213,53,0.3)', labelBackgroundColor: '#FCD535' },
@@ -1084,12 +1091,24 @@ const DashboardPage = () => {
             },
         });
 
-        const series = chart.addAreaSeries({
-            lineColor: '#FCD535',
-            topColor: 'rgba(252, 213, 53, 0.12)',
-            bottomColor: 'rgba(252, 213, 53, 0)',
-            lineWidth: 2,
-        });
+        let series;
+        if (chartType === 'candlestick') {
+            series = chart.addCandlestickSeries({
+                upColor: '#00e676',
+                downColor: '#ff1744',
+                borderDownColor: '#ff1744',
+                borderUpColor: '#00e676',
+                wickDownColor: '#ff1744',
+                wickUpColor: '#00e676',
+            });
+        } else {
+            series = chart.addAreaSeries({
+                lineColor: '#FCD535',
+                topColor: 'rgba(252, 213, 53, 0.12)',
+                bottomColor: 'rgba(252, 213, 53, 0)',
+                lineWidth: 2,
+            });
+        }
 
         seriesRef.current = series;
         chartRef.current = chart;
@@ -1097,7 +1116,7 @@ const DashboardPage = () => {
         const handleResize = () => chart.applyOptions({ width: chartContainerRef.current.clientWidth });
         window.addEventListener('resize', handleResize);
         return () => { window.removeEventListener('resize', handleResize); chart.remove(); };
-    }, []);
+    }, [chartType]);
 
     const fmtPrice = (p) => {
         if (!p) return '$0.00';
@@ -1261,7 +1280,7 @@ const DashboardPage = () => {
                     <div className="chart-toolbar">
                         <div className="chart-type-btns">
                             <button className={`chart-type-btn ${chartType === 'area' ? 'active' : ''}`} onClick={() => setChartType('area')}>Area</button>
-                            <button className="chart-type-btn" style={{ cursor: 'not-allowed' }}>Candlestick</button>
+                            <button className={`chart-type-btn ${chartType === 'candlestick' ? 'active' : ''}`} onClick={() => setChartType('candlestick')}>Candlestick</button>
                         </div>
                         <div style={{ display: 'flex', gap: '0.4rem' }}>
                             {['1m', '5m', '15m', '1h', '4h', '1d'].map(tf => (
