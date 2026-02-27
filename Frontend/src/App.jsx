@@ -8,6 +8,7 @@ import AnalyticsPage from './pages/AnalyticsPage';
 import SettingsPage from './pages/SettingsPage';
 import ContractsPage from './pages/ContractsPage';
 import HistoryPage from './pages/HistoryPage';
+import HeatmapPage from './pages/HeatmapPage';
 import NotificationToast from './components/NotificationToast';
 
 function App() {
@@ -23,6 +24,7 @@ function App() {
                 <Route path="/settings" element={<SettingsPage />} />
                 <Route path="/contracts" element={<ContractsPage />} />
                 <Route path="/history" element={<HistoryPage />} />
+                <Route path="/heatmap" element={<HeatmapPage />} />
             </Routes>
         </Router>
     );

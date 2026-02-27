@@ -1,7 +1,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import {
-    LayoutDashboard, BarChart3, Brain, Target, Wallet, Settings, Activity, FileCode2, History
+    LayoutDashboard, BarChart3, Brain, Target, Wallet, Settings, Activity, FileCode2, History, Grid3X3
 } from 'lucide-react';
 import ArbixLogo from './ArbixLogo';
 
@@ -11,6 +11,7 @@ const Sidebar = ({ active = 'dashboard', topCoins = [], selectedCoin, onSelectCo
         { to: '/coins', icon: <BarChart3 size={18} />, label: 'Markets', id: 'coins' },
         { to: '/agent', icon: <Brain size={18} />, label: 'AI Agent', id: 'agent' },
         { to: '/analytics', icon: <Activity size={18} />, label: 'Analytics', id: 'analytics' },
+        { to: '/heatmap', icon: <Grid3X3 size={18} />, label: 'Heatmap', id: 'heatmap' },
         { to: '/history', icon: <History size={18} />, label: 'History', id: 'history' },
         { to: '/contracts', icon: <FileCode2 size={18} />, label: 'Contracts', id: 'contracts' },
         { to: '/settings', icon: <Settings size={18} />, label: 'Settings', id: 'settings' },
