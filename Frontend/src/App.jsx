@@ -9,6 +9,7 @@ import {
     Sparkles, ChevronDown, ExternalLink, Star, Award, Hexagon
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { supabase } from './supabaseClient';
 
 // ═══════════════════════════════════════════════════════
 // LOGO COMPONENT
@@ -553,9 +554,32 @@ const DashboardPage = () => {
     const [chartType, setChartType] = useState('area');
     const [marketData, setMarketData] = useState(null);
     const [topCoins, setTopCoins] = useState([]);
+    const [storedPrices, setStoredPrices] = useState({});
+    const [timezone, setTimezone] = useState('IST'); // IST or EST
+    const [currentTime, setCurrentTime] = useState(new Date());
     const chartContainerRef = useRef();
     const chartRef = useRef();
     const seriesRef = useRef();
+
+    // Live clock updater
+    useEffect(() => {
+        const timer = setInterval(() => setCurrentTime(new Date()), 1000);
+        return () => clearInterval(timer);
+    }, []);
+
+    const getTimeInZone = (tz) => {
+        const options = { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true };
+        if (tz === 'IST') {
+            return currentTime.toLocaleTimeString('en-IN', { ...options, timeZone: 'Asia/Kolkata' });
+        } else {
+            return currentTime.toLocaleTimeString('en-US', { ...options, timeZone: 'America/New_York' });
+        }
+    };
+
+    // Timezone offset in seconds for chart (lightweight-charts uses UTC timestamps)
+    const getTzOffsetSeconds = () => {
+        return timezone === 'IST' ? 5.5 * 3600 : -5 * 3600; // IST = +5:30, EST = -5:00
+    };
     const wsRef = useRef(null);
 
     const coins = [
@@ -563,8 +587,41 @@ const DashboardPage = () => {
         { symbol: 'ETHUSDT', name: 'Ethereum', icon: 'Ξ' },
         { symbol: 'BNBUSDT', name: 'BNB', icon: '🔶' },
         { symbol: 'SOLUSDT', name: 'Solana', icon: '◎' },
+        { symbol: 'XRPUSDT', name: 'XRP', icon: '✕' },
+        { symbol: 'DOGEUSDT', name: 'Dogecoin', icon: 'Ð' },
         { symbol: 'ADAUSDT', name: 'Cardano', icon: '₳' },
+        { symbol: 'AVAXUSDT', name: 'Avalanche', icon: '🔺' },
+        { symbol: 'DOTUSDT', name: 'Polkadot', icon: '●' },
+        { symbol: 'MATICUSDT', name: 'Polygon', icon: '⬡' },
     ];
+
+    // Fetch latest stored prices from Supabase
+    useEffect(() => {
+        const fetchStoredPrices = async () => {
+            try {
+                const { data, error } = await supabase
+                    .from('coin_prices')
+                    .select('symbol, price, change_percent, high_24h, low_24h, volume, recorded_at')
+                    .order('recorded_at', { ascending: false });
+
+                if (data && !error) {
+                    // Group by symbol and take latest
+                    const latest = {};
+                    data.forEach(row => {
+                        if (!latest[row.symbol]) {
+                            latest[row.symbol] = row;
+                        }
+                    });
+                    setStoredPrices(latest);
+                }
+            } catch (e) {
+                console.log('Supabase fetch:', e);
+            }
+        };
+        fetchStoredPrices();
+        const interval = setInterval(fetchStoredPrices, 30000);
+        return () => clearInterval(interval);
+    }, []);
 
     // Fetch top coins real-time data for the sidebar
     useEffect(() => {
@@ -599,7 +656,8 @@ const DashboardPage = () => {
             const res = await fetch(`https://api.binance.com/api/v3/klines?symbol=${symbol}&interval=1m&limit=100`);
             const data = await res.json();
             if (Array.isArray(data)) {
-                const formatted = data.map(d => ({ time: d[0] / 1000, value: parseFloat(d[4]) }));
+                const offset = getTzOffsetSeconds();
+                const formatted = data.map(d => ({ time: Math.floor(d[0] / 1000) + offset, value: parseFloat(d[4]) }));
                 if (seriesRef.current) seriesRef.current.setData(formatted);
             }
         } catch (err) {
@@ -617,14 +675,14 @@ const DashboardPage = () => {
             if (!payload.error) {
                 setMarketData(payload);
                 if (seriesRef.current) {
-                    seriesRef.current.update({ time: Math.floor(Date.now() / 1000), value: parseFloat(payload.price) });
+                    seriesRef.current.update({ time: Math.floor(Date.now() / 1000) + getTzOffsetSeconds(), value: parseFloat(payload.price) });
                 }
             } else {
                 setSelectedCoin('BTCUSDT');
             }
         };
         return () => { if (wsRef.current) wsRef.current.close(); };
-    }, [selectedCoin]);
+    }, [selectedCoin, timezone]);
 
     useEffect(() => {
         if (!chartContainerRef.current) return;
@@ -745,9 +803,18 @@ const DashboardPage = () => {
                             <div className="status-dot live" />
                             <span style={{ color: '#00e676' }}>Live</span>
                         </div>
+                        <button
+                            className="status-badge"
+                            onClick={() => setTimezone(tz => tz === 'IST' ? 'EST' : 'IST')}
+                            style={{ cursor: 'pointer', border: '1px solid var(--border)', background: 'var(--bg-card)' }}
+                            title="Click to toggle timezone"
+                        >
+                            <Globe size={12} color="var(--gold)" />
+                            <span style={{ color: 'var(--gold)', fontWeight: 700 }}>{timezone}</span>
+                        </button>
                         <div className="status-badge">
                             <Clock size={12} color="var(--text-muted)" />
-                            <span style={{ color: 'var(--text-secondary)' }}>{new Date().toLocaleTimeString()}</span>
+                            <span style={{ color: 'var(--text-secondary)' }}>{getTimeInZone(timezone)}</span>
                         </div>
                     </div>
                 </div>
@@ -818,26 +885,52 @@ const DashboardPage = () => {
                     </div>
                 )}
 
-                {/* Pinned Assets */}
+                {/* Pinned Assets — from Supabase */}
                 <div style={{ marginTop: '2rem' }}>
-                    <div className="assets-section-title">Pinned Assets</div>
+                    <div className="assets-section-title">Top 10 Assets — Live from Supabase</div>
                     <div className="glass-grid">
-                        {coins.map(coin => (
-                            <motion.div
-                                key={coin.symbol}
-                                className={`coin-card ${selectedCoin === coin.symbol ? 'active' : ''}`}
-                                onClick={() => setSelectedCoin(coin.symbol)}
-                                whileHover={{ scale: 1.02 }}
-                                whileTap={{ scale: 0.98 }}
-                            >
-                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
-                                    <span style={{ fontSize: '1.3rem' }}>{coin.icon}</span>
-                                    <TrendingUp size={14} color={selectedCoin === coin.symbol ? '#FCD535' : '#333'} />
-                                </div>
-                                <div style={{ fontWeight: 700, fontSize: '1rem', marginBottom: '0.2rem' }}>{coin.name}</div>
-                                <div style={{ color: 'var(--text-muted)', fontSize: '0.72rem', fontFamily: 'var(--mono)' }}>{coin.symbol}</div>
-                            </motion.div>
-                        ))}
+                        {coins.map(coin => {
+                            const sp = storedPrices[coin.symbol];
+                            const change = sp ? parseFloat(sp.change_percent) : null;
+                            return (
+                                <motion.div
+                                    key={coin.symbol}
+                                    className={`coin-card ${selectedCoin === coin.symbol ? 'active' : ''}`}
+                                    onClick={() => setSelectedCoin(coin.symbol)}
+                                    whileHover={{ scale: 1.02 }}
+                                    whileTap={{ scale: 0.98 }}
+                                >
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                                        <span style={{ fontSize: '1.3rem' }}>{coin.icon}</span>
+                                        {change !== null && (
+                                            <span style={{
+                                                fontFamily: 'var(--mono)',
+                                                fontSize: '0.72rem',
+                                                fontWeight: 700,
+                                                color: change >= 0 ? 'var(--green)' : 'var(--red)',
+                                            }}>
+                                                {change >= 0 ? '+' : ''}{change.toFixed(2)}%
+                                            </span>
+                                        )}
+                                    </div>
+                                    <div style={{ fontWeight: 700, fontSize: '0.95rem', marginBottom: '0.15rem' }}>{coin.name}</div>
+                                    {sp ? (
+                                        <>
+                                            <div style={{ fontFamily: 'var(--mono)', fontSize: '1rem', fontWeight: 700, color: '#fff', marginBottom: '0.15rem' }}>
+                                                ${parseFloat(sp.price).toLocaleString(undefined, { maximumFractionDigits: 2 })}
+                                            </div>
+                                            <div style={{ fontFamily: 'var(--mono)', fontSize: '0.65rem', color: 'var(--text-muted)' }}>
+                                                Vol: {parseFloat(sp.volume).toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                                            </div>
+                                        </>
+                                    ) : (
+                                        <div style={{ color: 'var(--text-muted)', fontSize: '0.72rem', fontFamily: 'var(--mono)' }}>
+                                            {coin.symbol}
+                                        </div>
+                                    )}
+                                </motion.div>
+                            );
+                        })}
                     </div>
                 </div>
             </main>

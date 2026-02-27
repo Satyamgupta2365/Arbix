@@ -4,8 +4,93 @@ import asyncio
 import httpx
 import json
 import websockets as ws_client
+from contextlib import asynccontextmanager
 
-app = FastAPI()
+# ── Supabase Config ──
+SUPABASE_URL = "https://icdqhsxbceugjeasunom.supabase.co"
+SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImljZHFoc3hiY2V1Z2plYXN1bm9tIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIxMzg3OTYsImV4cCI6MjA4NzcxNDc5Nn0.pqgUr7js-DlvweLQ3J5jNlYh_lcKJuLEbNqnZKMFKUU"
+SUPABASE_HEADERS = {
+    "apikey": SUPABASE_KEY,
+    "Authorization": f"Bearer {SUPABASE_KEY}",
+    "Content-Type": "application/json",
+    "Prefer": "return=minimal",
+}
+
+TOP_COINS = [
+    "BTCUSDT", "ETHUSDT", "BNBUSDT", "SOLUSDT", "XRPUSDT",
+    "DOGEUSDT", "ADAUSDT", "AVAXUSDT", "DOTUSDT", "MATICUSDT"
+]
+
+# ── Background task: Fetch & store top 10 coin prices every 60s ──
+async def price_collector():
+    """Fetches top 10 coin prices from Binance and stores them in Supabase every 60 seconds."""
+    while True:
+        try:
+            async with httpx.AsyncClient(timeout=15) as client:
+                # Fetch all 24hr tickers from Binance
+                response = await client.get("https://api.binance.com/api/v3/ticker/24hr")
+                all_tickers = response.json()
+
+                # Filter to our top 10 coins
+                rows = []
+                for ticker in all_tickers:
+                    if ticker["symbol"] in TOP_COINS:
+                        rows.append({
+                            "symbol": ticker["symbol"],
+                            "price": float(ticker["lastPrice"]),
+                            "change_percent": float(ticker["priceChangePercent"]),
+                            "high_24h": float(ticker["highPrice"]),
+                            "low_24h": float(ticker["lowPrice"]),
+                            "volume": float(ticker["volume"]),
+                        })
+
+                if rows:
+                    # Insert into Supabase
+                    insert_url = f"{SUPABASE_URL}/rest/v1/coin_prices"
+                    res = await client.post(insert_url, headers=SUPABASE_HEADERS, json=rows)
+                    if res.status_code in (200, 201):
+                        print(f"✅ Stored {len(rows)} coin prices to Supabase")
+                    else:
+                        print(f"⚠️ Supabase insert status {res.status_code}: {res.text}")
+
+        except Exception as e:
+            print(f"❌ Price collector error: {e}")
+
+        await asyncio.sleep(60)
+
+
+async def cleanup_old_data():
+    """Deletes price records older than 24 hours to keep the database lean."""
+    while True:
+        try:
+            async with httpx.AsyncClient(timeout=15) as client:
+                from datetime import datetime, timedelta, timezone
+                cutoff = (datetime.now(timezone.utc) - timedelta(hours=24)).strftime('%Y-%m-%dT%H:%M:%S')
+                delete_url = f"{SUPABASE_URL}/rest/v1/coin_prices?recorded_at=lt.{cutoff}"
+                res = await client.delete(delete_url, headers=SUPABASE_HEADERS)
+                if res.status_code in (200, 204):
+                    print(f"🧹 Cleaned old price records (before {cutoff})")
+                else:
+                    print(f"⚠️ Cleanup status {res.status_code}: {res.text}")
+        except Exception as e:
+            print(f"❌ Cleanup error: {e}")
+
+        await asyncio.sleep(600)  # Every 10 minutes
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Startup: launch background tasks. Shutdown: cancel them."""
+    collector_task = asyncio.create_task(price_collector())
+    cleanup_task = asyncio.create_task(cleanup_old_data())
+    print("🚀 Arbix Backend started — price collector active")
+    yield
+    collector_task.cancel()
+    cleanup_task.cancel()
+    print("🛑 Arbix Backend stopped")
+
+
+app = FastAPI(lifespan=lifespan)
 
 # Enable CORS
 app.add_middleware(
@@ -16,9 +101,11 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
 @app.get("/")
 async def root():
     return {"message": "Arbix Ultra-Realtime Backend is running"}
+
 
 @app.get("/price/{symbol}")
 async def get_price(symbol: str):
@@ -27,40 +114,91 @@ async def get_price(symbol: str):
         response = await client.get(url)
         return response.json()
 
+
+@app.get("/api/prices/history/{symbol}")
+async def get_price_history(symbol: str, hours: int = 24):
+    """Get stored price history for a coin from Supabase."""
+    try:
+        from datetime import datetime, timedelta, timezone
+        cutoff = (datetime.now(timezone.utc) - timedelta(hours=hours)).strftime('%Y-%m-%dT%H:%M:%S')
+        url = (
+            f"{SUPABASE_URL}/rest/v1/coin_prices"
+            f"?symbol=eq.{symbol.upper()}"
+            f"&recorded_at=gte.{cutoff}"
+            f"&order=recorded_at.asc"
+            f"&select=price,change_percent,high_24h,low_24h,volume,recorded_at"
+        )
+        async with httpx.AsyncClient(timeout=10) as client:
+            res = await client.get(url, headers=SUPABASE_HEADERS)
+            return res.json()
+    except Exception as e:
+        return {"error": str(e)}
+
+
+@app.get("/api/prices/latest")
+async def get_latest_prices():
+    """Get the latest stored price for each top 10 coin."""
+    try:
+        results = []
+        async with httpx.AsyncClient(timeout=10) as client:
+            for symbol in TOP_COINS:
+                url = (
+                    f"{SUPABASE_URL}/rest/v1/coin_prices"
+                    f"?symbol=eq.{symbol}"
+                    f"&order=recorded_at.desc"
+                    f"&limit=1"
+                    f"&select=symbol,price,change_percent,high_24h,low_24h,volume,recorded_at"
+                )
+                res = await client.get(url, headers=SUPABASE_HEADERS)
+                data = res.json()
+                if data and isinstance(data, list) and len(data) > 0:
+                    results.append(data[0])
+        return results
+    except Exception as e:
+        return {"error": str(e)}
+
+
 @app.websocket("/ws/trading/{symbol}")
 async def websocket_endpoint(websocket: WebSocket, symbol: str):
     await websocket.accept()
-    # Binance Stream URL for symbol ticker (mini ticker or individual symbol ticker)
-    # เราจะใช้ <symbol>@ticker สำหรับข้อมูลราคา/high/low/volume แบบ real-time
     binance_ws_url = f"wss://stream.binance.com:9443/ws/{symbol.lower()}@ticker"
-    
+
     try:
-        async with ws_client.connect(binance_ws_url) as bws:
+        async with ws_client.connect(
+            binance_ws_url,
+            ping_interval=20,
+            ping_timeout=10,
+            close_timeout=5
+        ) as bws:
             while True:
-                data = await bws.recv()
-                msg = json.loads(data)
-                
-                # Format to our frontend expectations
-                # e: event type, s: symbol, p: price change, P: price change %, w: weight-avg, x: prev close
-                # c: last price, Q: last quantity, b: best bid, B: best bid qty, a: best ask, A: best ask qty
-                # o: open price, h: high price, l: low price, v: base vol, q: quote vol
-                
-                await websocket.send_json({
-                    "symbol": msg["s"],
-                    "price": msg["c"],
-                    "change": msg["P"],
-                    "high": msg["h"],
-                    "low": msg["l"],
-                    "volume": msg["v"]
-                })
+                try:
+                    data = await asyncio.wait_for(bws.recv(), timeout=30)
+                    msg = json.loads(data)
+
+                    await websocket.send_json({
+                        "symbol": msg.get("s", symbol),
+                        "price": msg.get("c", "0"),
+                        "change": msg.get("P", "0"),
+                        "high": msg.get("h", "0"),
+                        "low": msg.get("l", "0"),
+                        "volume": msg.get("v", "0")
+                    })
+                except asyncio.TimeoutError:
+                    # Send a ping to keep the connection alive
+                    continue
+                except WebSocketDisconnect:
+                    print(f"Client disconnected for {symbol}")
+                    break
     except WebSocketDisconnect:
         print(f"Client disconnected for {symbol}")
     except Exception as e:
         print(f"WebSocket error for {symbol}: {e}")
         try:
+            await websocket.send_json({"error": str(e)})
             await websocket.close()
         except:
             pass
+
 
 if __name__ == "__main__":
     import uvicorn
