@@ -1,10 +1,34 @@
+"""
+╔══════════════════════════════════════════════════════════════╗
+║              ARBIX — ArbiNet AI Backend v2.0                ║
+║   Autonomous Cross-Market AI Arbitrage Agent                ║
+║                                                              ║
+║   • 5 Oracle Sources (Binance, CoinGecko, PancakeSwap,     ║
+║     Jupiter, 1inch)                                          ║
+║   • Bellman-Ford Triangular Arbitrage Detection             ║
+║   • Cross-Chain Arbitrage (BSC ↔ Solana)                    ║
+║   • XAI Explainable Decision Engine                         ║
+║   • Anomaly Detection + Market Regime Classifier            ║
+║   • Portfolio Tracking + Drawdown Circuit Breaker          ║
+╚══════════════════════════════════════════════════════════════╝
+"""
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 import asyncio
 import httpx
 import json
+import time
 import websockets as ws_client
 from contextlib import asynccontextmanager
+
+# ── Engine Imports ──
+from engine.agent import agent, agent_loop
+from engine.price_matrix import price_matrix
+from engine.arbitrage_graph import arbitrage_detector
+from engine.scoring import scoring_engine
+from engine.xai import xai_engine
+from engine.portfolio import portfolio_engine
+from engine.anomaly import anomaly_detector
 
 # ── Supabase Config ──
 SUPABASE_URL = "https://icdqhsxbceugjeasunom.supabase.co"
@@ -21,17 +45,15 @@ TOP_COINS = [
     "DOGEUSDT", "ADAUSDT", "AVAXUSDT", "DOTUSDT", "MATICUSDT"
 ]
 
-# ── Background task: Fetch & store top 10 coin prices every 60s ──
-async def price_collector():
-    """Fetches top 10 coin prices from Binance and stores them in Supabase every 60 seconds."""
+
+# ── Background task: Store prices to Supabase every 60s ──
+async def supabase_price_sync():
+    """Syncs top 10 coin prices from Binance to Supabase every 60 seconds."""
     while True:
         try:
             async with httpx.AsyncClient(timeout=15) as client:
-                # Fetch all 24hr tickers from Binance
                 response = await client.get("https://api.binance.com/api/v3/ticker/24hr")
                 all_tickers = response.json()
-
-                # Filter to our top 10 coins
                 rows = []
                 for ticker in all_tickers:
                     if ticker["symbol"] in TOP_COINS:
@@ -43,56 +65,50 @@ async def price_collector():
                             "low_24h": float(ticker["lowPrice"]),
                             "volume": float(ticker["volume"]),
                         })
-
                 if rows:
-                    # Insert into Supabase
                     insert_url = f"{SUPABASE_URL}/rest/v1/coin_prices"
                     res = await client.post(insert_url, headers=SUPABASE_HEADERS, json=rows)
                     if res.status_code in (200, 201):
-                        print(f"✅ Stored {len(rows)} coin prices to Supabase")
-                    else:
-                        print(f"⚠️ Supabase insert status {res.status_code}: {res.text}")
-
+                        print(f"✅ Synced {len(rows)} prices to Supabase")
         except Exception as e:
-            print(f"❌ Price collector error: {e}")
-
+            print(f"❌ Supabase sync error: {e}")
         await asyncio.sleep(60)
 
 
 async def cleanup_old_data():
-    """Deletes price records older than 24 hours to keep the database lean."""
+    """Deletes price records older than 24 hours."""
     while True:
         try:
             async with httpx.AsyncClient(timeout=15) as client:
                 from datetime import datetime, timedelta, timezone
                 cutoff = (datetime.now(timezone.utc) - timedelta(hours=24)).strftime('%Y-%m-%dT%H:%M:%S')
                 delete_url = f"{SUPABASE_URL}/rest/v1/coin_prices?recorded_at=lt.{cutoff}"
-                res = await client.delete(delete_url, headers=SUPABASE_HEADERS)
-                if res.status_code in (200, 204):
-                    print(f"🧹 Cleaned old price records (before {cutoff})")
-                else:
-                    print(f"⚠️ Cleanup status {res.status_code}: {res.text}")
+                await client.delete(delete_url, headers=SUPABASE_HEADERS)
         except Exception as e:
             print(f"❌ Cleanup error: {e}")
-
-        await asyncio.sleep(600)  # Every 10 minutes
+        await asyncio.sleep(600)
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Startup: launch background tasks. Shutdown: cancel them."""
-    collector_task = asyncio.create_task(price_collector())
-    cleanup_task = asyncio.create_task(cleanup_old_data())
-    print("🚀 Arbix Backend started — price collector active")
+    """Startup: launch the AI agent + background tasks."""
+    tasks = [
+        asyncio.create_task(agent_loop()),           # � AI Agent heartbeat
+        asyncio.create_task(supabase_price_sync()),   # 📡 Supabase sync
+        asyncio.create_task(cleanup_old_data()),       # 🧹 Data cleanup
+    ]
+    print("╔══════════════════════════════════════════════╗")
+    print("║      🚀 ARBIX ArbiNet AI v2.0 STARTED       ║")
+    print("║  5 Oracles │ Bellman-Ford │ XAI │ Portfolio  ║")
+    print("╚══════════════════════════════════════════════╝")
     yield
-    collector_task.cancel()
-    cleanup_task.cancel()
+    for t in tasks:
+        t.cancel()
     print("🛑 Arbix Backend stopped")
 
 
-app = FastAPI(lifespan=lifespan)
+app = FastAPI(title="Arbix ArbiNet AI", version="2.0", lifespan=lifespan)
 
-# Enable CORS
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -102,10 +118,142 @@ app.add_middleware(
 )
 
 
+# ══════════════════════════════════════════════════════════
+#  CORE API ROUTES
+# ══════════════════════════════════════════════════════════
+
 @app.get("/")
 async def root():
-    return {"message": "Arbix Ultra-Realtime Backend is running"}
+    return {
+        "name": "Arbix ArbiNet AI",
+        "version": "2.0",
+        "status": agent.state,
+        "uptime": agent.get_status()["uptime"],
+        "scan_count": agent.scan_count,
+    }
 
+
+# ── Agent Routes ──
+
+@app.get("/api/agent/status")
+async def get_agent_status():
+    """Full agent status: state, performance, regime, thresholds."""
+    return agent.get_status()
+
+
+@app.get("/api/agent/activity")
+async def get_agent_activity(limit: int = 50):
+    """Agent activity log — state transitions, scans, trades."""
+    return agent.get_activity_log(limit)
+
+
+# ── Opportunity & Decision Routes ──
+
+@app.get("/api/agent/opportunities")
+async def get_opportunities():
+    """Current detected arbitrage opportunities."""
+    opps = arbitrage_detector.opportunities
+    return {
+        "count": len(opps),
+        "profitable": sum(1 for o in opps if o.net_profit_pct > 0),
+        "opportunities": [o.to_dict() for o in opps[:30]],
+        "stats": arbitrage_detector.get_stats(),
+    }
+
+
+@app.get("/api/agent/decisions")
+async def get_decisions(limit: int = 50):
+    """XAI decision audit trail — full rationale for every decision."""
+    return {
+        "decisions": xai_engine.get_recent_decisions(limit),
+        "stats": xai_engine.get_stats(),
+    }
+
+
+@app.get("/api/agent/decisions/{decision_id}")
+async def get_decision_detail(decision_id: str):
+    """Get a specific decision by ID."""
+    for d in xai_engine.decisions:
+        if d["decision_id"] == decision_id:
+            return d
+    return {"error": "Decision not found"}
+
+
+# ── Portfolio Routes ──
+
+@app.get("/api/agent/portfolio")
+async def get_portfolio():
+    """Portfolio: balance, P&L, equity curve, recent trades."""
+    return {
+        "performance": portfolio_engine.get_performance(),
+        "equity_curve": portfolio_engine.get_equity_curve()[-200:],
+        "recent_trades": portfolio_engine.get_recent_trades(20),
+    }
+
+
+@app.get("/api/agent/performance")
+async def get_performance():
+    """Performance metrics: win rate, Sharpe, drawdown."""
+    return portfolio_engine.get_performance()
+
+
+@app.get("/api/agent/trades")
+async def get_trades(limit: int = 50):
+    """Recent trades with full cost breakdown."""
+    return portfolio_engine.get_recent_trades(limit)
+
+
+# ── Price Matrix Routes ──
+
+@app.get("/api/prices/matrix")
+async def get_price_matrix():
+    """Full multi-source price matrix."""
+    return {
+        "matrix": price_matrix.get_full_matrix(),
+        "summary": price_matrix.get_summary(),
+    }
+
+
+@app.get("/api/prices/multi/{symbol}")
+async def get_multi_prices(symbol: str):
+    """All source prices for a specific symbol."""
+    sym = symbol.upper()
+    if not sym.endswith("USDT"):
+        sym += "USDT"
+    return {
+        "symbol": sym,
+        "sources": price_matrix.get_prices_for_symbol(sym),
+    }
+
+
+@app.get("/api/prices/spreads")
+async def get_spreads():
+    """Current spreads across all source pairs."""
+    spreads = price_matrix.get_spreads()
+    return {
+        "count": len(spreads),
+        "spreads": spreads[:50],
+    }
+
+
+# ── Market Intelligence Routes ──
+
+@app.get("/api/market/regime")
+async def get_market_regime():
+    """Current market regime classification."""
+    return anomaly_detector.get_regime()
+
+
+@app.get("/api/market/anomalies")
+async def get_anomalies(limit: int = 30):
+    """Recent market anomalies."""
+    return {
+        "anomalies": anomaly_detector.get_recent_anomalies(limit),
+        "regime": anomaly_detector.get_regime(),
+    }
+
+
+# ── Legacy Routes (backward compatible) ──
 
 @app.get("/price/{symbol}")
 async def get_price(symbol: str):
@@ -115,9 +263,180 @@ async def get_price(symbol: str):
         return response.json()
 
 
+# ══════════════════════════════════════════════════════════
+#  AGENT CONFIGURATION
+# ══════════════════════════════════════════════════════════
+
+@app.get("/api/agent/config")
+async def get_agent_config():
+    """Return current agent thresholds and config."""
+    return {
+        "min_confidence": agent.min_confidence,
+        "min_spread_pct": agent.min_spread_pct,
+        "max_risk": agent.max_risk,
+        "scan_interval": getattr(agent, 'scan_interval', 5),
+        "max_position_usd": getattr(agent, 'max_position_usd', 500),
+        "circuit_breaker_drawdown": getattr(agent, 'circuit_breaker_drawdown', 5.0),
+        "cooldown_seconds": getattr(agent, 'cooldown_seconds', 30),
+    }
+
+
+@app.post("/api/agent/config")
+async def update_agent_config(config: dict):
+    """Update agent thresholds in real-time."""
+    updated = {}
+    if "min_confidence" in config:
+        v = max(0, min(100, int(config["min_confidence"])))
+        agent.min_confidence = v
+        updated["min_confidence"] = v
+    if "min_spread_pct" in config:
+        v = max(0.001, min(5.0, float(config["min_spread_pct"])))
+        agent.min_spread_pct = v
+        updated["min_spread_pct"] = v
+    if "max_risk" in config:
+        v = max(0, min(100, int(config["max_risk"])))
+        agent.max_risk = v
+        updated["max_risk"] = v
+    if "scan_interval" in config:
+        v = max(1, min(60, int(config["scan_interval"])))
+        agent.scan_interval = v
+        updated["scan_interval"] = v
+    if "max_position_usd" in config:
+        v = max(10, min(10000, float(config["max_position_usd"])))
+        agent.max_position_usd = v
+        updated["max_position_usd"] = v
+    if "circuit_breaker_drawdown" in config:
+        v = max(0.5, min(20.0, float(config["circuit_breaker_drawdown"])))
+        agent.circuit_breaker_drawdown = v
+        updated["circuit_breaker_drawdown"] = v
+    if "cooldown_seconds" in config:
+        v = max(5, min(300, int(config["cooldown_seconds"])))
+        agent.cooldown_seconds = v
+        updated["cooldown_seconds"] = v
+    return {"status": "updated", "config": updated}
+
+
+# ══════════════════════════════════════════════════════════
+#  BNB CHAIN ON-CHAIN DATA
+# ══════════════════════════════════════════════════════════
+
+BSC_RPC = "https://bsc-dataseed1.binance.org"
+BSC_TESTNET_RPC = "https://data-seed-prebsc-1-s1.binance.org:8545"
+
+@app.get("/api/chain/gas")
+async def get_bnb_gas():
+    """Fetch BNB Chain gas price."""
+    try:
+        async with httpx.AsyncClient(timeout=10) as client:
+            res = await client.post(BSC_RPC, json={
+                "jsonrpc": "2.0", "method": "eth_gasPrice", "params": [], "id": 1
+            })
+            data = res.json()
+            gas_wei = int(data["result"], 16)
+            return {
+                "gas_price_gwei": gas_wei / 1e9,
+                "gas_price_wei": gas_wei,
+                "chain": "BNB Smart Chain",
+                "network": "mainnet",
+            }
+    except Exception as e:
+        return {"error": str(e), "gas_price_gwei": 3.0}
+
+
+@app.get("/api/chain/block")
+async def get_latest_block():
+    """Fetch latest BNB Chain block info."""
+    try:
+        async with httpx.AsyncClient(timeout=10) as client:
+            res = await client.post(BSC_RPC, json={
+                "jsonrpc": "2.0", "method": "eth_blockNumber", "params": [], "id": 1
+            })
+            block_hex = res.json()["result"]
+            block_num = int(block_hex, 16)
+
+            # Get block details
+            res2 = await client.post(BSC_RPC, json={
+                "jsonrpc": "2.0", "method": "eth_getBlockByNumber",
+                "params": [block_hex, False], "id": 2
+            })
+            block = res2.json().get("result", {})
+            return {
+                "block_number": block_num,
+                "timestamp": int(block.get("timestamp", "0x0"), 16),
+                "tx_count": len(block.get("transactions", [])),
+                "gas_used": int(block.get("gasUsed", "0x0"), 16),
+                "gas_limit": int(block.get("gasLimit", "0x0"), 16),
+                "miner": block.get("miner", ""),
+                "chain": "BNB Smart Chain",
+            }
+    except Exception as e:
+        return {"error": str(e)}
+
+
+@app.get("/api/chain/balance/{address}")
+async def get_bnb_balance(address: str):
+    """Fetch BNB balance for an address."""
+    try:
+        async with httpx.AsyncClient(timeout=10) as client:
+            res = await client.post(BSC_RPC, json={
+                "jsonrpc": "2.0", "method": "eth_getBalance",
+                "params": [address, "latest"], "id": 1
+            })
+            balance_wei = int(res.json()["result"], 16)
+            return {
+                "address": address,
+                "balance_bnb": balance_wei / 1e18,
+                "balance_wei": balance_wei,
+                "chain": "BNB Smart Chain",
+            }
+    except Exception as e:
+        return {"error": str(e)}
+
+
+@app.get("/api/chain/stats")
+async def get_chain_stats():
+    """Combined chain health stats."""
+    try:
+        async with httpx.AsyncClient(timeout=10) as client:
+            # Gas price
+            gas_res = await client.post(BSC_RPC, json={
+                "jsonrpc": "2.0", "method": "eth_gasPrice", "params": [], "id": 1
+            })
+            gas_gwei = int(gas_res.json()["result"], 16) / 1e9
+
+            # Latest block
+            block_res = await client.post(BSC_RPC, json={
+                "jsonrpc": "2.0", "method": "eth_blockNumber", "params": [], "id": 2
+            })
+            block_num = int(block_res.json()["result"], 16)
+
+            # BNB price from our matrix
+            bnb_prices = price_matrix.get_prices_for_symbol("BNBUSDT")
+            bnb_price = bnb_prices.get("binance", {}).get("price", 0) if bnb_prices else 0
+
+            # Estimate tx cost
+            gas_limit_swap = 250000  # typical PancakeSwap swap
+            tx_cost_bnb = (gas_gwei * gas_limit_swap) / 1e9
+            tx_cost_usd = tx_cost_bnb * bnb_price if bnb_price else 0
+
+            return {
+                "chain": "BNB Smart Chain",
+                "block_number": block_num,
+                "gas_price_gwei": round(gas_gwei, 2),
+                "bnb_price_usd": round(bnb_price, 2),
+                "estimated_swap_cost_bnb": round(tx_cost_bnb, 6),
+                "estimated_swap_cost_usd": round(tx_cost_usd, 4),
+                "network_status": "healthy",
+                "block_time_seconds": 3,
+                "tps_estimate": 60,
+            }
+    except Exception as e:
+        return {"error": str(e), "network_status": "error"}
+
+
+
 @app.get("/api/prices/history/{symbol}")
 async def get_price_history(symbol: str, hours: int = 24):
-    """Get stored price history for a coin from Supabase."""
     try:
         from datetime import datetime, timedelta, timezone
         cutoff = (datetime.now(timezone.utc) - timedelta(hours=hours)).strftime('%Y-%m-%dT%H:%M:%S')
@@ -137,7 +456,6 @@ async def get_price_history(symbol: str, hours: int = 24):
 
 @app.get("/api/prices/latest")
 async def get_latest_prices():
-    """Get the latest stored price for each top 10 coin."""
     try:
         results = []
         async with httpx.AsyncClient(timeout=10) as client:
@@ -158,46 +476,326 @@ async def get_latest_prices():
         return {"error": str(e)}
 
 
+# ══════════════════════════════════════════════════════════
+#  WEBSOCKETS
+# ══════════════════════════════════════════════════════════
+
+@app.websocket("/ws/agent")
+async def ws_agent(websocket: WebSocket):
+    """
+    Live WebSocket stream of ALL agent activity:
+    state transitions, opportunities, decisions, trades, anomalies.
+    """
+    await websocket.accept()
+    agent.subscribers.append(websocket)
+    print(f"📡 Agent WebSocket connected ({len(agent.subscribers)} total)")
+
+    try:
+        # Send current status on connect
+        await websocket.send_json({
+            "type": "status",
+            "data": agent.get_status(),
+        })
+
+        # Keep alive — listen for pings
+        while True:
+            try:
+                msg = await asyncio.wait_for(websocket.receive_text(), timeout=60)
+                if msg == "ping":
+                    await websocket.send_json({"type": "pong"})
+                elif msg == "status":
+                    await websocket.send_json({"type": "status", "data": agent.get_status()})
+            except asyncio.TimeoutError:
+                await websocket.send_json({"type": "heartbeat", "state": agent.state,
+                                            "scan_count": agent.scan_count})
+    except WebSocketDisconnect:
+        pass
+    finally:
+        if websocket in agent.subscribers:
+            agent.subscribers.remove(websocket)
+        print(f"📡 Agent WebSocket disconnected ({len(agent.subscribers)} remaining)")
+
+
 @app.websocket("/ws/trading/{symbol}")
-async def websocket_endpoint(websocket: WebSocket, symbol: str):
+async def ws_trading(websocket: WebSocket, symbol: str):
+    """Live Binance ticker stream for a single symbol."""
     await websocket.accept()
     binance_ws_url = f"wss://stream.binance.com:9443/ws/{symbol.lower()}@ticker"
 
     try:
         async with ws_client.connect(
-            binance_ws_url,
-            ping_interval=20,
-            ping_timeout=10,
-            close_timeout=5
+            binance_ws_url, ping_interval=20, ping_timeout=10, close_timeout=5
         ) as bws:
             while True:
                 try:
                     data = await asyncio.wait_for(bws.recv(), timeout=30)
                     msg = json.loads(data)
-
                     await websocket.send_json({
                         "symbol": msg.get("s", symbol),
                         "price": msg.get("c", "0"),
                         "change": msg.get("P", "0"),
                         "high": msg.get("h", "0"),
                         "low": msg.get("l", "0"),
-                        "volume": msg.get("v", "0")
+                        "volume": msg.get("v", "0"),
                     })
                 except asyncio.TimeoutError:
-                    # Send a ping to keep the connection alive
                     continue
                 except WebSocketDisconnect:
-                    print(f"Client disconnected for {symbol}")
                     break
     except WebSocketDisconnect:
-        print(f"Client disconnected for {symbol}")
+        pass
     except Exception as e:
-        print(f"WebSocket error for {symbol}: {e}")
         try:
             await websocket.send_json({"error": str(e)})
             await websocket.close()
         except:
             pass
+
+
+@app.websocket("/ws/spreads")
+async def ws_spreads(websocket: WebSocket):
+    """Live spread heatmap data — updates every 5 seconds."""
+    await websocket.accept()
+    try:
+        while True:
+            spreads = price_matrix.get_spreads()
+            regime = anomaly_detector.get_regime()
+            await websocket.send_json({
+                "type": "spreads",
+                "spreads": spreads[:30],
+                "regime": regime["regime"],
+                "timestamp": time.time(),
+            })
+            await asyncio.sleep(5)
+    except WebSocketDisconnect:
+        pass
+
+
+# ═══════════════════════════════════════════════════════════
+# ║         SMART CONTRACTS API ENDPOINTS                   ║
+# ═══════════════════════════════════════════════════════════
+
+# Contract addresses (BSC Mainnet — deployed or pending)
+CONTRACTS = {
+    "executor": {
+        "name": "ArbixExecutor",
+        "address": "0x0000000000000000000000000000000000000000",
+        "status": "compiled",
+        "description": "Flash-loan powered multi-DEX arbitrage executor",
+        "functions": [
+            {"name": "executeCrossDexArbitrage", "type": "write", "gas": "~280,000", "desc": "Two-leg cross-DEX arbitrage"},
+            {"name": "executeTriangularArbitrage", "type": "write", "gas": "~350,000", "desc": "Three-leg single-DEX arbitrage"},
+            {"name": "executeFlashArbitrage", "type": "write", "gas": "~400,000", "desc": "Flash loan arbitrage via PancakeSwap"},
+            {"name": "getBestPrice", "type": "read", "gas": "0", "desc": "Query best price across 4 DEXes"},
+            {"name": "calculateArbitrageProfit", "type": "read", "gas": "0", "desc": "Simulate profit between 2 DEXes"},
+            {"name": "getStats", "type": "read", "gas": "0", "desc": "Get executor performance stats"},
+            {"name": "getRecentTrades", "type": "read", "gas": "0", "desc": "Get on-chain trade history"},
+        ],
+        "safety": ["Circuit breaker", "Daily loss limit", "Min profit guard", "Deadline guard", "Pause mechanism"],
+    },
+    "oracle": {
+        "name": "ArbixPriceOracle",
+        "address": "0x0000000000000000000000000000000000000000",
+        "status": "compiled",
+        "description": "On-chain multi-DEX price aggregator with TWAP & anomaly detection",
+        "functions": [
+            {"name": "getPriceFromDex", "type": "read", "gas": "0", "desc": "Get price from specific DEX"},
+            {"name": "getAggregatedPrice", "type": "read", "gas": "0", "desc": "Aggregated price + spread"},
+            {"name": "recordPrice", "type": "write", "gas": "~120,000", "desc": "Record price for TWAP"},
+            {"name": "getTWAP", "type": "read", "gas": "0", "desc": "Get time-weighted average price"},
+        ],
+        "safety": ["Anomaly detection", "Multi-source aggregation", "TWAP smoothing"],
+    },
+    "vault": {
+        "name": "ArbixVault",
+        "address": "0x0000000000000000000000000000000000000000",
+        "status": "compiled",
+        "description": "Multi-sig vault for arbitrage capital management",
+        "functions": [
+            {"name": "deposit", "type": "write", "gas": "~80,000", "desc": "Deposit tokens into vault"},
+            {"name": "withdraw", "type": "write", "gas": "~100,000", "desc": "Withdraw with profit share"},
+            {"name": "fundExecutor", "type": "write", "gas": "~60,000", "desc": "Fund executor for trading"},
+            {"name": "collectProfits", "type": "write", "gas": "~80,000", "desc": "Collect profits from executor"},
+            {"name": "getVaultBalance", "type": "read", "gas": "0", "desc": "Get vault token balance"},
+        ],
+        "safety": ["Lock period", "Performance fee cap", "Non-reentrancy", "Emergency withdraw"],
+    },
+}
+
+# Deployed DEX routers used by contracts
+DEX_ROUTERS = {
+    "pancakeswap": {"address": "0x10ED43C718714eb63d5aA57B78B54704E256024E", "name": "PancakeSwap V2", "fee": "0.25%"},
+    "biswap":      {"address": "0x3a6d8cA21D1CF76F653A67577FA0D27453350dD8", "name": "BiSwap V2",      "fee": "0.10%"},
+    "thena":       {"address": "0xd4ae6eCA985340Dd434D38F470aCCce4DC78D109", "name": "THENA",          "fee": "0.30%"},
+    "babyswap":    {"address": "0x325E343f1dE602396E256B67eFd1F61C3A6B38Bd", "name": "BabySwap",       "fee": "0.30%"},
+}
+
+BSC_TOKENS = {
+    "WBNB":  {"address": "0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c", "decimals": 18},
+    "USDT":  {"address": "0x55d398326f99059fF775485246999027B3197955", "decimals": 18},
+    "BUSD":  {"address": "0xe9e7CEA3DedcA5984780Bafc599bD69ADd087D56", "decimals": 18},
+    "USDC":  {"address": "0x8AC76a51cc950d9822D68b83fE1Ad97B32Cd580d", "decimals": 18},
+    "BTCB":  {"address": "0x7130d2A12B9BCbFAe4f2634d864A1Ee1Ce3Ead9c", "decimals": 18},
+    "ETH":   {"address": "0x2170Ed0880ac9A755fd29B2688956BD959F933F8", "decimals": 18},
+}
+
+
+@app.get("/api/contracts")
+async def get_contracts():
+    """Get all smart contract info."""
+    return {
+        "contracts": CONTRACTS,
+        "dex_routers": DEX_ROUTERS,
+        "tokens": BSC_TOKENS,
+        "network": {
+            "name": "BNB Smart Chain",
+            "chain_id": 56,
+            "rpc": "https://bsc-dataseed1.binance.org",
+            "explorer": "https://bscscan.com",
+        },
+    }
+
+
+@app.get("/api/contracts/simulate")
+async def simulate_arbitrage(
+    token_in: str = "USDT",
+    token_out: str = "WBNB",
+    amount: float = 1000.0,
+):
+    """Simulate cross-DEX arbitrage profit using on-chain getAmountsOut."""
+    token_in_addr = BSC_TOKENS.get(token_in, {}).get("address")
+    token_out_addr = BSC_TOKENS.get(token_out, {}).get("address")
+    if not token_in_addr or not token_out_addr:
+        return {"error": "Unknown token"}
+
+    decimals_in = BSC_TOKENS[token_in]["decimals"]
+    amount_wei = int(amount * (10 ** decimals_in))
+
+    # getAmountsOut selector
+    selector = "0xd06ca61f"
+    amount_hex = hex(amount_wei)[2:].zfill(64)
+    # offset to array
+    offset = "0000000000000000000000000000000000000000000000000000000000000040"
+    array_len = "0000000000000000000000000000000000000000000000000000000000000002"
+    addr_in = token_in_addr[2:].lower().zfill(64)
+    addr_out = token_out_addr[2:].lower().zfill(64)
+    calldata = selector + amount_hex + offset + array_len + addr_in + addr_out
+
+    results = {}
+    async with httpx.AsyncClient(timeout=10) as client:
+        for dex_name, dex_info in DEX_ROUTERS.items():
+            try:
+                payload = {
+                    "jsonrpc": "2.0", "id": 1, "method": "eth_call",
+                    "params": [{"to": dex_info["address"], "data": calldata}, "latest"]
+                }
+                res = await client.post("https://bsc-dataseed1.binance.org", json=payload)
+                data = res.json()
+                result_hex = data.get("result", "0x")
+                if result_hex and len(result_hex) > 66:
+                    out_hex = result_hex[-64:]
+                    out_wei = int(out_hex, 16)
+                    decimals_out = BSC_TOKENS[token_out]["decimals"]
+                    out_human = out_wei / (10 ** decimals_out)
+                    results[dex_name] = {
+                        "amount_out": round(out_human, 8),
+                        "router": dex_info["address"],
+                        "fee": dex_info["fee"],
+                    }
+            except Exception:
+                pass
+
+    # Find arbitrage opportunity
+    if len(results) >= 2:
+        sorted_dexes = sorted(results.items(), key=lambda x: x[1]["amount_out"])
+        cheapest = sorted_dexes[0]
+        most_expensive = sorted_dexes[-1]
+        spread_pct = ((most_expensive[1]["amount_out"] - cheapest[1]["amount_out"]) / cheapest[1]["amount_out"]) * 100
+
+        return {
+            "token_in": token_in,
+            "token_out": token_out,
+            "amount_in": amount,
+            "dex_prices": results,
+            "best_buy": cheapest[0],
+            "best_sell": most_expensive[0],
+            "spread_pct": round(spread_pct, 4),
+            "estimated_profit": round(spread_pct * amount / 100, 4),
+            "profitable": spread_pct > 0.1,
+        }
+
+    return {"token_in": token_in, "token_out": token_out, "dex_prices": results, "profitable": False}
+
+
+@app.get("/api/contracts/reserves/{token_a}/{token_b}")
+async def get_pair_reserves(token_a: str, token_b: str):
+    """Get liquidity reserves for a token pair across DEXes."""
+    addr_a = BSC_TOKENS.get(token_a, {}).get("address")
+    addr_b = BSC_TOKENS.get(token_b, {}).get("address")
+    if not addr_a or not addr_b:
+        return {"error": "Unknown token"}
+
+    # getPair(address,address) selector: 0xe6a43905
+    selector = "0xe6a43905"
+    a_hex = addr_a[2:].lower().zfill(64)
+    b_hex = addr_b[2:].lower().zfill(64)
+    calldata = selector + a_hex + b_hex
+
+    factories = {
+        "pancakeswap": "0xcA143Ce32Fe78f1f7019d7d551a6402fC5350c73",
+        "biswap": "0x858E3312ed3A876947EA49d572A7C42DE08af7EE",
+    }
+
+    results = {}
+    async with httpx.AsyncClient(timeout=10) as client:
+        for dex_name, factory_addr in factories.items():
+            try:
+                # Get pair address
+                payload = {
+                    "jsonrpc": "2.0", "id": 1, "method": "eth_call",
+                    "params": [{"to": factory_addr, "data": calldata}, "latest"]
+                }
+                res = await client.post("https://bsc-dataseed1.binance.org", json=payload)
+                data = res.json()
+                pair_hex = data.get("result", "0x")
+                pair_addr = "0x" + pair_hex[-40:]
+
+                if pair_addr == "0x" + "0" * 40:
+                    results[dex_name] = {"pair": None, "reserves": None}
+                    continue
+
+                # Get reserves from pair
+                reserves_selector = "0x0902f1ac"
+                payload2 = {
+                    "jsonrpc": "2.0", "id": 2, "method": "eth_call",
+                    "params": [{"to": pair_addr, "data": reserves_selector}, "latest"]
+                }
+                res2 = await client.post("https://bsc-dataseed1.binance.org", json=payload2)
+                data2 = res2.json()
+                reserves_hex = data2.get("result", "0x")
+
+                if len(reserves_hex) >= 130:
+                    r0 = int(reserves_hex[2:66], 16)
+                    r1 = int(reserves_hex[66:130], 16)
+                    dec_a = BSC_TOKENS[token_a]["decimals"]
+                    dec_b = BSC_TOKENS[token_b]["decimals"]
+                    results[dex_name] = {
+                        "pair": pair_addr,
+                        "reserve_a": round(r0 / (10 ** dec_a), 4),
+                        "reserve_b": round(r1 / (10 ** dec_b), 4),
+                        "reserve_a_raw": r0,
+                        "reserve_b_raw": r1,
+                    }
+                else:
+                    results[dex_name] = {"pair": pair_addr, "reserves": "error"}
+            except Exception as e:
+                results[dex_name] = {"error": str(e)}
+
+    return {
+        "token_a": token_a,
+        "token_b": token_b,
+        "reserves": results,
+    }
 
 
 if __name__ == "__main__":

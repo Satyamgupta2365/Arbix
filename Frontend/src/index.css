@@ -1236,6 +1236,55 @@ h6 {
 }
 
 /* ═══════════════════════════════════════════
+   GLASS CARD
+   ═══════════════════════════════════════════ */
+
+.glass-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 0.75rem;
+  transition: all 0.25s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.glass-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(252, 213, 53, 0.1), transparent);
+}
+
+.glass-card:hover {
+  border-color: rgba(255, 255, 255, 0.08);
+  background: var(--bg-card-hover);
+}
+
+/* ═══════════════════════════════════════════
+   SIDEBAR (Agent / Analytics pages use .sidebar)
+   ═══════════════════════════════════════════ */
+
+.sidebar {
+  width: 220px;
+  min-width: 220px;
+  background: var(--bg-deep);
+  border-right: 1px solid var(--border);
+  padding: 1.2rem;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+}
+
+.sidebar-bottom {
+  margin-top: auto;
+  padding-top: 0.8rem;
+  border-top: 1px solid var(--border);
+}
+
+/* ═══════════════════════════════════════════
    DASHBOARD
    ═══════════════════════════════════════════ */
 
@@ -1753,5 +1802,65 @@ h6 {
   .trusted-inner {
     flex-direction: column;
     gap: 1rem;
+  }
+
+  .sidebar {
+    display: none;
+  }
+
+  .dashboard-main {
+    padding: 1rem !important;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   Settings Page — Custom Range Sliders
+   ═══════════════════════════════════════════════════════════════ */
+
+input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 6px;
+  border-radius: 3px;
+  outline: none;
+}
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #FCD535;
+  border: 2px solid #000;
+  cursor: pointer;
+  box-shadow: 0 0 8px rgba(252, 213, 53, 0.4);
+  transition: transform 0.15s, box-shadow 0.15s;
+}
+input[type="range"]::-webkit-slider-thumb:hover {
+  transform: scale(1.25);
+  box-shadow: 0 0 14px rgba(252, 213, 53, 0.6);
+}
+input[type="range"]::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #FCD535;
+  border: 2px solid #000;
+  cursor: pointer;
+  box-shadow: 0 0 8px rgba(252, 213, 53, 0.4);
+}
+input[type="range"]::-moz-range-track {
+  height: 6px;
+  border-radius: 3px;
+  background: rgba(255,255,255,0.06);
+}
+input[type="range"]:focus {
+  outline: none;
+}
+
+/* ═══ Settings Grid Responsive ═══ */
+@media (max-width: 900px) {
+  .settings-grid {
+    grid-template-columns: 1fr !important;
   }
 }
