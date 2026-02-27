@@ -14,11 +14,13 @@ const DashboardPage = () => {
     const [selectedCoin, setSelectedCoin] = useState('BTCUSDT');
     const [searchInput, setSearchInput] = useState('');
     const [chartType, setChartType] = useState('area');
+    const [chartInterval, setChartInterval] = useState('5m');
     const [marketData, setMarketData] = useState(null);
     const [topCoins, setTopCoins] = useState([]);
     const [storedPrices, setStoredPrices] = useState({});
     const [timezone, setTimezone] = useState('IST');
     const [currentTime, setCurrentTime] = useState(new Date());
+    const [chartLoading, setChartLoading] = useState(false);
     const chartContainerRef = useRef();
     const chartRef = useRef();
     const seriesRef = useRef();
@@ -94,7 +96,7 @@ const DashboardPage = () => {
                     .sort((a, b) => parseFloat(b.quoteVolume) - parseFloat(a.quoteVolume))
                     .slice(0, 10);
                 setTopCoins(top);
-            } catch { }
+            } catch (e) { }
         };
         fetchTopCoins();
         const interval = setInterval(fetchTopCoins, 8000);
@@ -111,69 +113,157 @@ const DashboardPage = () => {
         }
     };
 
-    const fetchHistory = async (symbol) => {
-        try {
-            const res = await fetch(`https://api.binance.com/api/v3/klines?symbol=${symbol}&interval=1m&limit=100`);
-            const data = await res.json();
-            if (Array.isArray(data)) {
-                const offset = getTzOffsetSeconds();
-                const formatted = data.map(d => ({ time: Math.floor(d[0] / 1000) + offset, value: parseFloat(d[4]) }));
-                if (seriesRef.current) seriesRef.current.setData(formatted);
-            }
-        } catch (err) {
-            console.error("History fetch error:", err);
-        }
-    };
-
+    // WebSocket for live price updates
     useEffect(() => {
         if (!selectedCoin) return;
-        fetchHistory(selectedCoin);
 
-        wsRef.current = new WebSocket(`ws://localhost:8000/ws/trading/${selectedCoin}`);
-        wsRef.current.onmessage = (event) => {
-            const payload = JSON.parse(event.data);
-            if (!payload.error) {
-                setMarketData(payload);
-                if (seriesRef.current) {
-                    seriesRef.current.update({ time: Math.floor(Date.now() / 1000) + getTzOffsetSeconds(), value: parseFloat(payload.price) });
+        const ws = new WebSocket(`ws://localhost:8000/ws/trading/${selectedCoin}`);
+        wsRef.current = ws;
+        ws.onmessage = (event) => {
+            try {
+                const payload = JSON.parse(event.data);
+                if (!payload.error) {
+                    setMarketData(payload);
+                } else {
+                    setSelectedCoin('BTCUSDT');
                 }
-            } else {
-                setSelectedCoin('BTCUSDT');
+            } catch (e) {
+                console.error('WS parse error:', e);
             }
         };
-        return () => { if (wsRef.current) wsRef.current.close(); };
-    }, [selectedCoin, timezone]);
+        ws.onerror = () => { };
+        return () => { ws.close(); };
+    }, [selectedCoin]);
 
+    // Update chart with live WS data
+    useEffect(() => {
+        if (!seriesRef.current || !marketData) return;
+        try {
+            const t = Math.floor(Date.now() / 1000) + getTzOffsetSeconds();
+            const p = parseFloat(marketData.price);
+            if (chartType === 'candlestick') {
+                seriesRef.current.update({ time: t, open: p, high: p, low: p, close: p });
+            } else {
+                seriesRef.current.update({ time: t, value: p });
+            }
+        } catch (e) {
+            // series might be removed during chart rebuild
+        }
+    }, [marketData]);
+
+    // Build chart + fetch 24h data
     useEffect(() => {
         if (!chartContainerRef.current) return;
 
-        const chart = createChart(chartContainerRef.current, {
-            layout: { background: { type: ColorType.Solid, color: '#0a0a0e' }, textColor: '#5a5a6e' },
-            grid: { vertLines: { color: 'rgba(255,255,255,0.02)' }, horzLines: { color: 'rgba(255,255,255,0.02)' } },
-            width: chartContainerRef.current.clientWidth,
-            height: 400,
-            timeScale: { timeVisible: true, secondsVisible: true, borderColor: 'rgba(255,255,255,0.05)' },
-            rightPriceScale: { borderColor: 'rgba(255,255,255,0.05)' },
-            crosshair: {
-                vertLine: { color: 'rgba(252,213,53,0.3)', labelBackgroundColor: '#FCD535' },
-                horzLine: { color: 'rgba(252,213,53,0.3)', labelBackgroundColor: '#FCD535' },
-            },
-        });
+        // Destroy old chart safely
+        if (chartRef.current) {
+            try { chartRef.current.remove(); } catch (e) { }
+            chartRef.current = null;
+            seriesRef.current = null;
+        }
 
-        const series = chart.addAreaSeries({
-            lineColor: '#FCD535',
-            topColor: 'rgba(252, 213, 53, 0.12)',
-            bottomColor: 'rgba(252, 213, 53, 0)',
-            lineWidth: 2,
-        });
+        const container = chartContainerRef.current;
+        let chart;
+        try {
+            chart = createChart(container, {
+                layout: { background: { type: ColorType.Solid, color: '#0a0a0e' }, textColor: '#5a5a6e' },
+                grid: { vertLines: { color: 'rgba(255,255,255,0.02)' }, horzLines: { color: 'rgba(255,255,255,0.02)' } },
+                width: container.clientWidth,
+                height: 400,
+                timeScale: { timeVisible: true, secondsVisible: false, borderColor: 'rgba(255,255,255,0.05)' },
+                rightPriceScale: { borderColor: 'rgba(255,255,255,0.05)' },
+                crosshair: {
+                    vertLine: { color: 'rgba(252,213,53,0.3)', labelBackgroundColor: '#FCD535' },
+                    horzLine: { color: 'rgba(252,213,53,0.3)', labelBackgroundColor: '#FCD535' },
+                },
+            });
+        } catch (e) {
+            console.error('Chart creation error:', e);
+            return;
+        }
+
+        let series;
+        if (chartType === 'candlestick') {
+            series = chart.addCandlestickSeries({
+                upColor: '#00e676',
+                downColor: '#ff1744',
+                borderUpColor: '#00e676',
+                borderDownColor: '#ff1744',
+                wickUpColor: '#00e676',
+                wickDownColor: '#ff1744',
+            });
+        } else {
+            series = chart.addAreaSeries({
+                lineColor: '#FCD535',
+                topColor: 'rgba(252, 213, 53, 0.12)',
+                bottomColor: 'rgba(252, 213, 53, 0)',
+                lineWidth: 2,
+            });
+        }
 
         seriesRef.current = series;
         chartRef.current = chart;
 
-        const handleResize = () => chart.applyOptions({ width: chartContainerRef.current.clientWidth });
+        // Fetch 24h chart data
+        const cType = chartType;
+        setChartLoading(true);
+
+        const loadData = async () => {
+            const offset = getTzOffsetSeconds();
+            try {
+                const res = await fetch(`http://localhost:8000/api/prices/chart/${selectedCoin}?interval=${chartInterval}&hours=24`);
+                const data = await res.json();
+                if (data && data.klines && data.klines.length > 0 && series) {
+                    if (cType === 'candlestick') {
+                        series.setData(data.klines.map(k => ({
+                            time: Math.floor(k.time / 1000) + offset,
+                            open: k.open, high: k.high, low: k.low, close: k.close,
+                        })));
+                    } else {
+                        series.setData(data.klines.map(k => ({
+                            time: Math.floor(k.time / 1000) + offset,
+                            value: k.close,
+                        })));
+                    }
+                }
+            } catch (err) {
+                console.error('Chart data error, using Binance fallback:', err);
+                try {
+                    const res = await fetch(`https://api.binance.com/api/v3/klines?symbol=${selectedCoin}&interval=${chartInterval}&limit=288`);
+                    const data = await res.json();
+                    if (Array.isArray(data) && series) {
+                        if (cType === 'candlestick') {
+                            series.setData(data.map(d => ({
+                                time: Math.floor(d[0] / 1000) + offset,
+                                open: parseFloat(d[1]), high: parseFloat(d[2]),
+                                low: parseFloat(d[3]), close: parseFloat(d[4]),
+                            })));
+                        } else {
+                            series.setData(data.map(d => ({
+                                time: Math.floor(d[0] / 1000) + offset,
+                                value: parseFloat(d[4]),
+                            })));
+                        }
+                    }
+                } catch (e2) {
+                    console.error('Fallback also failed:', e2);
+                }
+            }
+            setChartLoading(false);
+        };
+        loadData();
+
+        const handleResize = () => {
+            if (container && chart) {
+                try { chart.applyOptions({ width: container.clientWidth }); } catch (e) { }
+            }
+        };
         window.addEventListener('resize', handleResize);
-        return () => { window.removeEventListener('resize', handleResize); chart.remove(); };
-    }, []);
+        return () => {
+            window.removeEventListener('resize', handleResize);
+            try { chart.remove(); } catch (e) { }
+        };
+    }, [selectedCoin, chartType, chartInterval, timezone]);
 
     const fmtPrice = (p) => {
         if (!p) return '$0.00';
@@ -254,12 +344,19 @@ const DashboardPage = () => {
                     <div className="chart-toolbar">
                         <div className="chart-type-btns">
                             <button className={`chart-type-btn ${chartType === 'area' ? 'active' : ''}`} onClick={() => setChartType('area')}>Area</button>
-                            <button className="chart-type-btn" style={{ cursor: 'not-allowed' }}>Candlestick</button>
+                            <button className={`chart-type-btn ${chartType === 'candlestick' ? 'active' : ''}`} onClick={() => setChartType('candlestick')}>Candlestick</button>
                         </div>
-                        <div style={{ display: 'flex', gap: '0.4rem' }}>
-                            {['1m', '5m', '15m', '1h', '4h', '1d'].map(tf => (
-                                <button key={tf} className={`chart-type-btn ${tf === '1m' ? 'active' : ''}`} style={{ padding: '0.3rem 0.6rem', fontSize: '0.72rem' }}>{tf}</button>
+                        <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
+                            {chartLoading && <span style={{ fontSize: '0.7rem', color: 'var(--gold)', marginRight: '0.5rem' }}>Loading 24h...</span>}
+                            {['1m', '5m', '15m', '1h', '4h'].map(tf => (
+                                <button
+                                    key={tf}
+                                    className={`chart-type-btn ${chartInterval === tf ? 'active' : ''}`}
+                                    style={{ padding: '0.3rem 0.6rem', fontSize: '0.72rem' }}
+                                    onClick={() => setChartInterval(tf)}
+                                >{tf}</button>
                             ))}
+                            <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', marginLeft: '0.5rem' }}>24h</span>
                         </div>
                     </div>
                     <div ref={chartContainerRef} style={{ width: '100%', minHeight: 400 }} />

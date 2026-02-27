@@ -497,6 +497,85 @@ async def get_price_history(symbol: str, hours: int = 24):
         return {"error": str(e)}
 
 
+@app.get("/api/prices/chart/{symbol}")
+async def get_chart_data(symbol: str, interval: str = "5m", hours: int = 24):
+    """
+    Fetch 24h chart data for ANY coin.
+    Returns Binance klines + Supabase stored points merged together.
+    """
+    sym = symbol.upper()
+    if not sym.endswith("USDT"):
+        sym += "USDT"
+
+    # Calculate how many klines we need for the requested hours
+    interval_minutes = {"1m": 1, "5m": 5, "15m": 15, "1h": 60, "4h": 240}
+    mins = interval_minutes.get(interval, 5)
+    limit = min(int((hours * 60) / mins), 1000)
+
+    result = {"symbol": sym, "interval": interval, "hours": hours, "klines": [], "supabase_points": []}
+
+    async with httpx.AsyncClient(timeout=15) as client:
+        # 1. Fetch klines from Binance (works for ANY coin)
+        try:
+            kline_url = (
+                f"https://api.binance.com/api/v3/klines"
+                f"?symbol={sym}&interval={interval}&limit={limit}"
+            )
+            res = await client.get(kline_url)
+            klines_raw = res.json()
+            if isinstance(klines_raw, list):
+                result["klines"] = [
+                    {
+                        "time": int(k[0]),           # open time ms
+                        "open": float(k[1]),
+                        "high": float(k[2]),
+                        "low": float(k[3]),
+                        "close": float(k[4]),
+                        "volume": float(k[5]),
+                    }
+                    for k in klines_raw
+                ]
+        except Exception as e:
+            print(f"⚠️ Binance klines error for {sym}: {e}")
+
+        # 2. Also fetch Supabase stored points (for coins being tracked)
+        try:
+            from datetime import datetime, timedelta, timezone as tz
+            cutoff = (datetime.now(tz.utc) - timedelta(hours=hours)).strftime('%Y-%m-%dT%H:%M:%S')
+            supa_url = (
+                f"{SUPABASE_URL}/rest/v1/coin_prices"
+                f"?symbol=eq.{sym}"
+                f"&recorded_at=gte.{cutoff}"
+                f"&order=recorded_at.asc"
+                f"&select=price,recorded_at"
+            )
+            supa_res = await client.get(supa_url, headers=SUPABASE_HEADERS)
+            supa_data = supa_res.json()
+            if isinstance(supa_data, list):
+                result["supabase_points"] = supa_data
+        except Exception as e:
+            print(f"⚠️ Supabase history error for {sym}: {e}")
+
+        # 3. If this is a non-top-10 coin, seed its price into Supabase for future tracking
+        if sym not in TOP_COINS and result["klines"]:
+            try:
+                latest = result["klines"][-1]
+                row = {
+                    "symbol": sym,
+                    "price": latest["close"],
+                    "change_percent": 0.0,
+                    "high_24h": max(k["high"] for k in result["klines"]),
+                    "low_24h": min(k["low"] for k in result["klines"]),
+                    "volume": sum(k["volume"] for k in result["klines"][-12:]),
+                }
+                insert_url = f"{SUPABASE_URL}/rest/v1/coin_prices"
+                await client.post(insert_url, headers=SUPABASE_HEADERS, json=[row])
+            except Exception:
+                pass
+
+    return result
+
+
 @app.get("/api/prices/latest")
 async def get_latest_prices():
     try:
