@@ -7,6 +7,7 @@ import AgentPage from './pages/AgentPage';
 import AnalyticsPage from './pages/AnalyticsPage';
 import SettingsPage from './pages/SettingsPage';
 import ContractsPage from './pages/ContractsPage';
+import HistoryPage from './pages/HistoryPage';
 import NotificationToast from './components/NotificationToast';
 
 function App() {
@@ -21,6 +22,7 @@ function App() {
                 <Route path="/analytics" element={<AnalyticsPage />} />
                 <Route path="/settings" element={<SettingsPage />} />
                 <Route path="/contracts" element={<ContractsPage />} />
+                <Route path="/history" element={<HistoryPage />} />
             </Routes>
         </Router>
     );

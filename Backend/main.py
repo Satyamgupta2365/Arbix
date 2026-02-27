@@ -92,13 +92,60 @@ async def cleanup_old_data():
         await asyncio.sleep(600)
 
 
+# ── Track which trade IDs we've already synced ──
+_synced_trade_ids = set()
+
+async def supabase_trade_sync():
+    """Syncs new trades from the portfolio engine to Supabase every 30 seconds."""
+    global _synced_trade_ids
+    while True:
+        try:
+            trades = portfolio_engine.get_recent_trades(200)
+            new_trades = [t for t in trades if t["id"] not in _synced_trade_ids]
+            if new_trades:
+                from datetime import datetime, timezone
+                rows = []
+                for t in new_trades:
+                    rows.append({
+                        "trade_id": t["id"],
+                        "opportunity_id": t.get("opportunity_id", ""),
+                        "decision_id": t.get("decision_id", ""),
+                        "trade_type": t.get("type", "unknown"),
+                        "symbols": ",".join(t.get("symbols", [])),
+                        "sources": ",".join(t.get("sources", [])),
+                        "position_size": t.get("position_size", 0),
+                        "spread_pct": t.get("net_profit_pct", 0),
+                        "pnl": t.get("pnl", 0),
+                        "won": t.get("won", False),
+                        "confidence": t.get("confidence", 0),
+                        "risk": t.get("risk", 0),
+                        "gas_cost": t.get("cost_breakdown", {}).get("gas", 0),
+                        "slippage_cost": t.get("cost_breakdown", {}).get("slippage", 0),
+                        "total_costs": t.get("cost_breakdown", {}).get("total_costs", 0),
+                        "executed_at": datetime.fromtimestamp(t.get("timestamp", 0), tz=timezone.utc).isoformat(),
+                    })
+                if rows:
+                    async with httpx.AsyncClient(timeout=15) as client:
+                        insert_url = f"{SUPABASE_URL}/rest/v1/trade_history"
+                        res = await client.post(insert_url, headers=SUPABASE_HEADERS, json=rows)
+                        if res.status_code in (200, 201):
+                            _synced_trade_ids.update(t["id"] for t in new_trades)
+                            print(f"✅ Synced {len(rows)} trades to Supabase")
+                        else:
+                            print(f"⚠️ Trade sync response: {res.status_code} {res.text[:200]}")
+        except Exception as e:
+            print(f"❌ Trade sync error: {e}")
+        await asyncio.sleep(30)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Startup: launch the AI agent + background tasks."""
     tasks = [
-        asyncio.create_task(agent_loop()),           # � AI Agent heartbeat
+        asyncio.create_task(agent_loop()),           # 🧠 AI Agent heartbeat
         asyncio.create_task(supabase_price_sync()),   # 📡 Supabase sync
         asyncio.create_task(cleanup_old_data()),       # 🧹 Data cleanup
+        asyncio.create_task(supabase_trade_sync()),    # 💰 Trade history sync
     ]
     print("╔══════════════════════════════════════════════╗")
     print("║      🚀 ARBIX ArbiNet AI v2.0 STARTED       ║")
@@ -229,6 +276,62 @@ async def get_performance():
 async def get_trades(limit: int = 50):
     """Recent trades with full cost breakdown."""
     return portfolio_engine.get_recent_trades(limit)
+
+
+@app.get("/api/trades/history")
+async def get_trade_history(limit: int = 200):
+    """Get full trade history from Supabase."""
+    try:
+        url = (
+            f"{SUPABASE_URL}/rest/v1/trade_history"
+            f"?order=executed_at.desc"
+            f"&limit={limit}"
+            f"&select=*"
+        )
+        async with httpx.AsyncClient(timeout=10) as client:
+            res = await client.get(url, headers=SUPABASE_HEADERS)
+            data = res.json()
+            if isinstance(data, list):
+                return {"trades": data, "count": len(data)}
+            return {"trades": [], "count": 0, "note": "Table may not exist yet"}
+    except Exception as e:
+        # Fallback to in-memory trades
+        return {
+            "trades": portfolio_engine.get_recent_trades(limit),
+            "count": len(portfolio_engine.trades),
+            "source": "memory",
+        }
+
+
+@app.get("/api/trades/stats")
+async def get_trade_stats():
+    """Trade statistics summary."""
+    trades = portfolio_engine.get_recent_trades(500)
+    total = len(trades)
+    wins = sum(1 for t in trades if t.get("won"))
+    losses = total - wins
+    total_pnl = sum(t.get("pnl", 0) for t in trades)
+    total_volume = sum(t.get("position_size", 0) for t in trades)
+    total_gas = sum(t.get("cost_breakdown", {}).get("gas", 0) for t in trades)
+    total_slippage = sum(t.get("cost_breakdown", {}).get("slippage", 0) for t in trades)
+    avg_confidence = sum(t.get("confidence", 0) for t in trades) / max(total, 1)
+    best_trade = max(trades, key=lambda t: t.get("pnl", 0), default=None)
+    worst_trade = min(trades, key=lambda t: t.get("pnl", 0), default=None)
+
+    return _sanitize({
+        "total_trades": total,
+        "wins": wins,
+        "losses": losses,
+        "win_rate": round(wins / max(total, 1) * 100, 1),
+        "total_pnl": round(total_pnl, 4),
+        "total_volume": round(total_volume, 2),
+        "total_gas_costs": round(total_gas, 4),
+        "total_slippage": round(total_slippage, 4),
+        "avg_confidence": round(avg_confidence, 1),
+        "avg_pnl_per_trade": round(total_pnl / max(total, 1), 4),
+        "best_trade": best_trade,
+        "worst_trade": worst_trade,
+    })
 
 
 @app.get("/api/agent/ml-accuracy")
