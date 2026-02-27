@@ -6,10 +6,215 @@ import {
     ArrowRight, ChevronRight, Search, TrendingUp, Cpu, RefreshCw,
     Shield, Eye, Brain, Layers, Globe, Lock, ArrowUpRight, Play,
     Target, Gauge, LineChart, Server, CheckCircle, Clock, Users,
-    Sparkles, ChevronDown, ExternalLink, Star, Award, Hexagon
+    Sparkles, ChevronDown, ExternalLink, Star, Award, Hexagon,
+    LogOut, Copy, Check, Plus, ArrowDownCircle, X, Link2
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from './supabaseClient';
+
+// ═══════════════════════════════════════════════════════
+// BSC TESTNET CONFIGURATION (EIP-3085)
+// ═══════════════════════════════════════════════════════
+
+const BSC_TESTNET_PARAMS = {
+    chainId: '0x61', // 97 in decimal
+    chainName: 'BNB Smart Chain Testnet',
+    nativeCurrency: {
+        name: 'Binance Chain Native Token',
+        symbol: 'tBNB',
+        decimals: 18
+    },
+    rpcUrls: ['https://data-seed-prebsc-1-s1.bnbchain.org:8545'],
+    blockExplorerUrls: ['https://testnet.bscscan.com']
+};
+
+// ═══════════════════════════════════════════════════════
+// WALLET PANEL COMPONENT
+// ═══════════════════════════════════════════════════════
+
+const WalletPanel = ({ walletState, onConnect, onDisconnect, onImportToken }) => {
+    const [copied, setCopied] = useState(false);
+    const [tokenAddress, setTokenAddress] = useState('');
+    const [tokenSymbol, setTokenSymbol] = useState('');
+    const [tokenDecimals, setTokenDecimals] = useState('18');
+    const [importStatus, setImportStatus] = useState('');
+
+    const copyAddress = () => {
+        if (walletState.address) {
+            navigator.clipboard.writeText(walletState.address);
+            setCopied(true);
+            setTimeout(() => setCopied(false), 2000);
+        }
+    };
+
+    const shortenAddress = (addr) => {
+        if (!addr) return '';
+        return `${addr.slice(0, 6)}...${addr.slice(-4)}`;
+    };
+
+    const handleImportToken = async (e) => {
+        e.preventDefault();
+        if (!tokenAddress.trim()) return;
+        setImportStatus('importing');
+        try {
+            await onImportToken({
+                address: tokenAddress.trim(),
+                symbol: tokenSymbol.trim() || 'TOKEN',
+                decimals: parseInt(tokenDecimals) || 18
+            });
+            setImportStatus('success');
+            setTokenAddress('');
+            setTokenSymbol('');
+            setTokenDecimals('18');
+            setTimeout(() => setImportStatus(''), 3000);
+        } catch {
+            setImportStatus('error');
+            setTimeout(() => setImportStatus(''), 3000);
+        }
+    };
+
+    if (!walletState.connected) {
+        return (
+            <motion.div
+                className="wallet-panel"
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+            >
+                <div className="wallet-panel-header">
+                    <div className="wallet-panel-title">
+                        <Wallet size={18} />
+                        <span>Connect Wallet</span>
+                    </div>
+                </div>
+                <div className="wallet-connect-body">
+                    <div className="wallet-connect-icon">
+                        <div className="wallet-orb">
+                            <Link2 size={32} />
+                        </div>
+                    </div>
+                    <h3 className="wallet-connect-heading">Link Your Wallet</h3>
+                    <p className="wallet-connect-desc">
+                        Connect your Binance Wallet or MetaMask to access BSC Testnet trading features.
+                    </p>
+                    <button className="wallet-connect-btn" onClick={onConnect}>
+                        <Wallet size={16} />
+                        {walletState.connecting ? 'Connecting...' : 'Connect Wallet'}
+                    </button>
+                    <div className="wallet-network-badge">
+                        <div className="wallet-network-dot" />
+                        <span>BNB Smart Chain Testnet</span>
+                    </div>
+                </div>
+            </motion.div>
+        );
+    }
+
+    return (
+        <motion.div
+            className="wallet-panel"
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+        >
+            {/* Header */}
+            <div className="wallet-panel-header">
+                <div className="wallet-panel-title">
+                    <div className="wallet-status-dot connected" />
+                    <span>Wallet Connected</span>
+                </div>
+                <button className="wallet-disconnect-btn" onClick={onDisconnect} title="Disconnect">
+                    <LogOut size={14} />
+                </button>
+            </div>
+
+            {/* Address & Balance */}
+            <div className="wallet-info-section">
+                <div className="wallet-address-row">
+                    <div className="wallet-label">Address</div>
+                    <div className="wallet-address-value">
+                        <span className="wallet-address-text">{shortenAddress(walletState.address)}</span>
+                        <button className="wallet-copy-btn" onClick={copyAddress}>
+                            {copied ? <Check size={12} /> : <Copy size={12} />}
+                        </button>
+                        <a
+                            href={`https://testnet.bscscan.com/address/${walletState.address}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="wallet-explorer-btn"
+                            title="View on BscScan"
+                        >
+                            <ExternalLink size={12} />
+                        </a>
+                    </div>
+                </div>
+                <div className="wallet-balance-row">
+                    <div className="wallet-label">Balance</div>
+                    <div className="wallet-balance-value">
+                        <span className="wallet-balance-amount">{walletState.balance}</span>
+                        <span className="wallet-balance-symbol">tBNB</span>
+                    </div>
+                </div>
+                <div className="wallet-network-row">
+                    <div className="wallet-label">Network</div>
+                    <div className="wallet-network-info">
+                        <div className="wallet-network-dot" />
+                        <span>BSC Testnet</span>
+                        <span className="wallet-chain-id">Chain 97</span>
+                    </div>
+                </div>
+            </div>
+
+            {/* Import Token */}
+            <div className="wallet-import-section">
+                <div className="wallet-import-header">
+                    <Plus size={14} />
+                    <span>Import Token</span>
+                </div>
+                <form onSubmit={handleImportToken} className="wallet-import-form">
+                    <input
+                        type="text"
+                        placeholder="Token contract address (0x...)"
+                        value={tokenAddress}
+                        onChange={(e) => setTokenAddress(e.target.value)}
+                        className="wallet-import-input"
+                    />
+                    <div className="wallet-import-row">
+                        <input
+                            type="text"
+                            placeholder="Symbol"
+                            value={tokenSymbol}
+                            onChange={(e) => setTokenSymbol(e.target.value)}
+                            className="wallet-import-input-sm"
+                        />
+                        <input
+                            type="number"
+                            placeholder="Decimals"
+                            value={tokenDecimals}
+                            onChange={(e) => setTokenDecimals(e.target.value)}
+                            className="wallet-import-input-sm"
+                        />
+                    </div>
+                    <button
+                        type="submit"
+                        className={`wallet-import-btn ${importStatus}`}
+                        disabled={importStatus === 'importing'}
+                    >
+                        {importStatus === 'importing' ? (
+                            <><RefreshCw size={14} className="spin-icon" /> Importing...</>
+                        ) : importStatus === 'success' ? (
+                            <><Check size={14} /> Token Added!</>
+                        ) : importStatus === 'error' ? (
+                            <><X size={14} /> Failed</>
+                        ) : (
+                            <><ArrowDownCircle size={14} /> Import to Wallet</>
+                        )}
+                    </button>
+                </form>
+            </div>
+        </motion.div>
+    );
+};
 
 // ═══════════════════════════════════════════════════════
 // LOGO COMPONENT
@@ -561,6 +766,164 @@ const DashboardPage = () => {
     const chartRef = useRef();
     const seriesRef = useRef();
 
+    // ── Wallet State ──
+    const [walletState, setWalletState] = useState({
+        connected: false,
+        connecting: false,
+        address: null,
+        balance: '0.0000',
+        chainId: null
+    });
+    const [showWalletPanel, setShowWalletPanel] = useState(false);
+
+    // Fetch wallet balance
+    const fetchBalance = async (provider, address) => {
+        try {
+            const balanceHex = await provider.request({
+                method: 'eth_getBalance',
+                params: [address, 'latest']
+            });
+            const balanceWei = parseInt(balanceHex, 16);
+            const balanceEth = balanceWei / 1e18;
+            return balanceEth.toFixed(4);
+        } catch {
+            return '0.0000';
+        }
+    };
+
+    // Connect wallet handler
+    const connectWallet = async () => {
+        const provider = window.ethereum || window.BinanceChain;
+        if (!provider) {
+            alert('Please install the Binance Wallet or MetaMask extension!');
+            return;
+        }
+
+        setWalletState(prev => ({ ...prev, connecting: true }));
+
+        try {
+            // 1. Request accounts
+            const accounts = await provider.request({ method: 'eth_requestAccounts' });
+
+            // 2. Try to switch to BSC Testnet
+            try {
+                await provider.request({
+                    method: 'wallet_switchEthereumChain',
+                    params: [{ chainId: '0x61' }]
+                });
+            } catch (switchError) {
+                if (switchError.code === 4902) {
+                    await provider.request({
+                        method: 'wallet_addEthereumChain',
+                        params: [BSC_TESTNET_PARAMS]
+                    });
+                } else {
+                    throw switchError;
+                }
+            }
+
+            // 3. Get balance
+            const balance = await fetchBalance(provider, accounts[0]);
+
+            setWalletState({
+                connected: true,
+                connecting: false,
+                address: accounts[0],
+                balance,
+                chainId: '0x61'
+            });
+
+            console.log('Successfully connected to BSC Testnet!');
+        } catch (error) {
+            console.error('Connection failed', error);
+            setWalletState(prev => ({ ...prev, connecting: false }));
+        }
+    };
+
+    // Disconnect wallet handler
+    const disconnectWallet = () => {
+        setWalletState({
+            connected: false,
+            connecting: false,
+            address: null,
+            balance: '0.0000',
+            chainId: null
+        });
+        setShowWalletPanel(false);
+    };
+
+    // Import token handler
+    const importToken = async ({ address, symbol, decimals }) => {
+        const provider = window.ethereum || window.BinanceChain;
+        if (!provider) throw new Error('No provider');
+
+        const wasAdded = await provider.request({
+            method: 'wallet_watchAsset',
+            params: {
+                type: 'ERC20',
+                options: {
+                    address,
+                    symbol,
+                    decimals,
+                    image: ''
+                }
+            }
+        });
+
+        if (!wasAdded) throw new Error('User rejected');
+        // Refresh balance after import
+        const newBalance = await fetchBalance(provider, walletState.address);
+        setWalletState(prev => ({ ...prev, balance: newBalance }));
+    };
+
+    // Listen for account/chain changes
+    useEffect(() => {
+        const provider = window.ethereum || window.BinanceChain;
+        if (!provider) return;
+
+        const handleAccountsChanged = async (accounts) => {
+            if (accounts.length === 0) {
+                disconnectWallet();
+            } else if (walletState.connected) {
+                const balance = await fetchBalance(provider, accounts[0]);
+                setWalletState(prev => ({
+                    ...prev,
+                    address: accounts[0],
+                    balance
+                }));
+            }
+        };
+
+        const handleChainChanged = (chainId) => {
+            setWalletState(prev => ({ ...prev, chainId }));
+            if (chainId !== '0x61') {
+                console.warn('Switched away from BSC Testnet');
+            }
+        };
+
+        provider.on('accountsChanged', handleAccountsChanged);
+        provider.on('chainChanged', handleChainChanged);
+
+        return () => {
+            provider.removeListener('accountsChanged', handleAccountsChanged);
+            provider.removeListener('chainChanged', handleChainChanged);
+        };
+    }, [walletState.connected]);
+
+    // Auto-refresh balance every 30s
+    useEffect(() => {
+        if (!walletState.connected || !walletState.address) return;
+        const provider = window.ethereum || window.BinanceChain;
+        if (!provider) return;
+
+        const interval = setInterval(async () => {
+            const balance = await fetchBalance(provider, walletState.address);
+            setWalletState(prev => ({ ...prev, balance }));
+        }, 30000);
+
+        return () => clearInterval(interval);
+    }, [walletState.connected, walletState.address]);
+
     // Live clock updater
     useEffect(() => {
         const timer = setInterval(() => setCurrentTime(new Date()), 1000);
@@ -653,12 +1016,33 @@ const DashboardPage = () => {
 
     const fetchHistory = async (symbol) => {
         try {
-            const res = await fetch(`https://api.binance.com/api/v3/klines?symbol=${symbol}&interval=1m&limit=100`);
-            const data = await res.json();
-            if (Array.isArray(data)) {
-                const offset = getTzOffsetSeconds();
-                const formatted = data.map(d => ({ time: Math.floor(d[0] / 1000) + offset, value: parseFloat(d[4]) }));
-                if (seriesRef.current) seriesRef.current.setData(formatted);
+            // Try fetching 24h kline data from our backend database first
+            let loaded = false;
+            try {
+                const dbRes = await fetch(`http://localhost:8000/api/klines/${symbol}`);
+                const dbData = await dbRes.json();
+                if (Array.isArray(dbData) && dbData.length > 10) {
+                    const offset = getTzOffsetSeconds();
+                    const formatted = dbData.map(d => ({
+                        time: Math.floor(d.open_time / 1000) + offset,
+                        value: d.close_price
+                    }));
+                    if (seriesRef.current) seriesRef.current.setData(formatted);
+                    loaded = true;
+                }
+            } catch (e) {
+                console.log('DB kline fetch failed, using Binance API fallback:', e);
+            }
+
+            // Fallback: fetch 24h data directly from Binance (5m interval = 288 candles)
+            if (!loaded) {
+                const res = await fetch(`https://api.binance.com/api/v3/klines?symbol=${symbol}&interval=5m&limit=288`);
+                const data = await res.json();
+                if (Array.isArray(data)) {
+                    const offset = getTzOffsetSeconds();
+                    const formatted = data.map(d => ({ time: Math.floor(d[0] / 1000) + offset, value: parseFloat(d[4]) }));
+                    if (seriesRef.current) seriesRef.current.setData(formatted);
+                }
             }
         } catch (err) {
             console.error("History fetch error:", err);
@@ -816,8 +1200,35 @@ const DashboardPage = () => {
                             <Clock size={12} color="var(--text-muted)" />
                             <span style={{ color: 'var(--text-secondary)' }}>{getTimeInZone(timezone)}</span>
                         </div>
+                        {/* Wallet Connect Button */}
+                        <button
+                            className={`wallet-topbar-btn ${walletState.connected ? 'connected' : ''}`}
+                            onClick={() => setShowWalletPanel(prev => !prev)}
+                        >
+                            <Wallet size={14} />
+                            {walletState.connected ? (
+                                <>
+                                    <span className="wallet-topbar-bal">{walletState.balance} tBNB</span>
+                                    <span className="wallet-topbar-addr">{walletState.address?.slice(0, 4)}...{walletState.address?.slice(-3)}</span>
+                                </>
+                            ) : (
+                                <span>Connect Wallet</span>
+                            )}
+                        </button>
                     </div>
                 </div>
+
+                {/* Wallet Panel */}
+                <AnimatePresence>
+                    {showWalletPanel && (
+                        <WalletPanel
+                            walletState={walletState}
+                            onConnect={connectWallet}
+                            onDisconnect={disconnectWallet}
+                            onImportToken={importToken}
+                        />
+                    )}
+                </AnimatePresence>
 
                 {/* Coin Header */}
                 <div className="coin-header">

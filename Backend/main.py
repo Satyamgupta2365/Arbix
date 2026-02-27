@@ -59,6 +59,61 @@ async def price_collector():
         await asyncio.sleep(60)
 
 
+async def kline_collector():
+    """Fetches 24h kline (5m interval) data from Binance for all top coins and stores in Supabase."""
+    while True:
+        try:
+            async with httpx.AsyncClient(timeout=30) as client:
+                for symbol in TOP_COINS:
+                    try:
+                        # Fetch 24h of 5-minute klines (288 candles)
+                        url = f"https://api.binance.com/api/v3/klines?symbol={symbol}&interval=5m&limit=288"
+                        response = await client.get(url)
+                        klines = response.json()
+
+                        if not isinstance(klines, list):
+                            continue
+
+                        rows = []
+                        for k in klines:
+                            rows.append({
+                                "symbol": symbol,
+                                "open_time": int(k[0]),
+                                "open_price": float(k[1]),
+                                "high_price": float(k[2]),
+                                "low_price": float(k[3]),
+                                "close_price": float(k[4]),
+                                "volume": float(k[5]),
+                                "close_time": int(k[6]),
+                            })
+
+                        if rows:
+                            # Delete old klines for this symbol first
+                            delete_url = f"{SUPABASE_URL}/rest/v1/coin_klines?symbol=eq.{symbol}"
+                            await client.delete(delete_url, headers=SUPABASE_HEADERS)
+
+                            # Insert new klines in batches of 100
+                            for i in range(0, len(rows), 100):
+                                batch = rows[i:i + 100]
+                                insert_url = f"{SUPABASE_URL}/rest/v1/coin_klines"
+                                res = await client.post(insert_url, headers=SUPABASE_HEADERS, json=batch)
+                                if res.status_code not in (200, 201):
+                                    print(f"⚠️ Kline insert error for {symbol}: {res.status_code}")
+
+                        # Small delay between coins to avoid rate limits
+                        await asyncio.sleep(0.5)
+
+                    except Exception as e:
+                        print(f"❌ Kline fetch error for {symbol}: {e}")
+
+                print(f"📊 Updated 24h kline data for {len(TOP_COINS)} coins")
+
+        except Exception as e:
+            print(f"❌ Kline collector error: {e}")
+
+        await asyncio.sleep(300)  # Every 5 minutes
+
+
 async def cleanup_old_data():
     """Deletes price records older than 24 hours to keep the database lean."""
     while True:
@@ -82,10 +137,12 @@ async def cleanup_old_data():
 async def lifespan(app: FastAPI):
     """Startup: launch background tasks. Shutdown: cancel them."""
     collector_task = asyncio.create_task(price_collector())
+    kline_task = asyncio.create_task(kline_collector())
     cleanup_task = asyncio.create_task(cleanup_old_data())
-    print("🚀 Arbix Backend started — price collector active")
+    print("🚀 Arbix Backend started — price collector & kline collector active")
     yield
     collector_task.cancel()
+    kline_task.cancel()
     cleanup_task.cancel()
     print("🛑 Arbix Backend stopped")
 
@@ -154,6 +211,26 @@ async def get_latest_prices():
                 if data and isinstance(data, list) and len(data) > 0:
                     results.append(data[0])
         return results
+    except Exception as e:
+        return {"error": str(e)}
+
+
+@app.get("/api/klines/{symbol}")
+async def get_klines(symbol: str):
+    """Get stored 24h kline data for a coin from Supabase."""
+    try:
+        url = (
+            f"{SUPABASE_URL}/rest/v1/coin_klines"
+            f"?symbol=eq.{symbol.upper()}"
+            f"&order=open_time.asc"
+            f"&select=open_time,open_price,high_price,low_price,close_price,volume"
+        )
+        async with httpx.AsyncClient(timeout=10) as client:
+            res = await client.get(url, headers=SUPABASE_HEADERS)
+            data = res.json()
+            if isinstance(data, list):
+                return data
+            return []
     except Exception as e:
         return {"error": str(e)}
 
