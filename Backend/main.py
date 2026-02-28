@@ -804,8 +804,8 @@ async def ws_spreads(websocket: WebSocket):
 CONTRACTS = {
     "executor": {
         "name": "ArbixExecutor",
-        "address": "0x0000000000000000000000000000000000000000",
-        "status": "compiled",
+        "address": "0x2df9e83a350027991170ab82a83FBD1836d76d3B",
+        "status": "deployed",
         "description": "Flash-loan powered multi-DEX arbitrage executor",
         "functions": [
             {"name": "executeCrossDexArbitrage", "type": "write", "gas": "~280,000", "desc": "Two-leg cross-DEX arbitrage"},
@@ -820,8 +820,8 @@ CONTRACTS = {
     },
     "oracle": {
         "name": "ArbixPriceOracle",
-        "address": "0x0000000000000000000000000000000000000000",
-        "status": "compiled",
+        "address": "0x73764D77B6736a2643Ea6fB773AeBb79FaFc7a83",
+        "status": "deployed",
         "description": "On-chain multi-DEX price aggregator with TWAP & anomaly detection",
         "functions": [
             {"name": "getPriceFromDex", "type": "read", "gas": "0", "desc": "Get price from specific DEX"},
@@ -833,8 +833,8 @@ CONTRACTS = {
     },
     "vault": {
         "name": "ArbixVault",
-        "address": "0x0000000000000000000000000000000000000000",
-        "status": "compiled",
+        "address": "0xde18515788bd4bE6FA3C09AFd7957E1A47aEc307",
+        "status": "deployed",
         "description": "Multi-sig vault for arbitrage capital management",
         "functions": [
             {"name": "deposit", "type": "write", "gas": "~80,000", "desc": "Deposit tokens into vault"},
@@ -873,10 +873,10 @@ async def get_contracts():
         "dex_routers": DEX_ROUTERS,
         "tokens": BSC_TOKENS,
         "network": {
-            "name": "BNB Smart Chain",
-            "chain_id": 56,
-            "rpc": "https://bsc-dataseed1.binance.org",
-            "explorer": "https://bscscan.com",
+            "name": "BNB Smart Chain Testnet",
+            "chain_id": 97,
+            "rpc": "https://data-seed-prebsc-1-s1.binance.org:8545",
+            "explorer": "https://testnet.bscscan.com",
         },
     }
 

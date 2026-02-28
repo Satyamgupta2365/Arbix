@@ -83,7 +83,15 @@ const ContractsPage = () => {
                             borderRadius: '12px',
                             fontSize: '0.75rem',
                             fontWeight: 600,
-                        }}>BNB Chain</span>
+                        }}>BSC Testnet</span>
+                        <span style={{
+                            background: 'rgba(0,230,118,0.1)',
+                            color: '#00E676',
+                            padding: '4px 12px',
+                            borderRadius: '12px',
+                            fontSize: '0.75rem',
+                            fontWeight: 600,
+                        }}>✓ Deployed</span>
                     </div>
                     <p style={{ color: '#888', fontSize: '0.9rem', margin: 0 }}>
                         On-chain arbitrage infrastructure — Flash loans, multi-DEX execution, price oracles & vault management
@@ -256,6 +264,15 @@ const ContractsPage = () => {
                                                         style={{ cursor: 'pointer', color: copied === contract.address ? '#00E676' : '#555' }}
                                                         onClick={(e) => { e.stopPropagation(); copyAddress(contract.address); }}
                                                     />
+                                                    <a 
+                                                        href={`https://testnet.bscscan.com/address/${contract.address}`}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        onClick={(e) => e.stopPropagation()}
+                                                        style={{ color: '#FCD335', display: 'flex', alignItems: 'center' }}
+                                                    >
+                                                        <ExternalLink size={14} />
+                                                    </a>
                                                 </div>
                                             </div>
 
