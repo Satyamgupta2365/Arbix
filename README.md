@@ -423,6 +423,53 @@ Built for **BNB Chain × YZi Labs Hackathon, Bengaluru 2026**.
 
 ---
 
+## Deployed Smart Contracts (BSC Testnet)
+
+All contracts are **live on BSC Testnet (Chain ID 97)** with multiple successful transactions:
+
+| Contract | Address | Txns | BSCScan |
+|---|---|---|---|
+| **ArbixPriceOracle** | `0x73764D77B6736a2643Ea6fB773AeBb79FaFc7a83` | 3 | [View ↗](https://testnet.bscscan.com/address/0x73764D77B6736a2643Ea6fB773AeBb79FaFc7a83) |
+| **ArbixExecutor** | `0x2df9e83a350027991170ab82a83FBD1836d76d3B` | 4 | [View ↗](https://testnet.bscscan.com/address/0x2df9e83a350027991170ab82a83FBD1836d76d3B) |
+| **ArbixVault** | `0xde18515788bd4bE6FA3C09AFd7957E1A47aEc307` | 3 | [View ↗](https://testnet.bscscan.com/address/0xde18515788bd4bE6FA3C09AFd7957E1A47aEc307) |
+
+**Deployer**: [`0xcdc3d2ec640F8364ee9f58e7338Ed0e79f9001e0`](https://testnet.bscscan.com/address/0xcdc3d2ec640F8364ee9f58e7338Ed0e79f9001e0)
+
+---
+
+## Roadmap
+
+### Phase 1 — Hackathon (Current) ✅
+- [x] 5 oracle sources with real-time validation
+- [x] 7-model ML ensemble for scoring
+- [x] Bellman-Ford + triangular arbitrage detection
+- [x] XAI explainable decision engine
+- [x] 3 smart contracts deployed on BSC Testnet
+- [x] 9-page React UI with real-time WebSockets
+
+### Phase 2 — Testnet Validation (Q2 2026)
+- [ ] End-to-end on-chain arbitrage execution via ArbixExecutor
+- [ ] Vault deposit/withdraw flow with real token integration
+- [ ] Contract verification on BSCScan
+- [ ] Automated test suite for all contracts
+- [ ] Multi-wallet support for agent operations
+
+### Phase 3 — Mainnet Launch (Q3 2026)
+- [ ] Deploy to BSC Mainnet with audited contracts
+- [ ] Integrate with PancakeSwap V3 concentrated liquidity
+- [ ] Add opBNB L2 for reduced gas costs
+- [ ] Implement MEV protection (Flashbots-style bundling)
+- [ ] Launch public vault for community depositors
+
+### Phase 4 — Scale (Q4 2026)
+- [ ] Cross-chain arbitrage: BSC ↔ Ethereum ↔ Solana
+- [ ] DAO governance for vault parameters
+- [ ] Mobile app with push notifications for opportunities
+- [ ] API access for institutional traders
+- [ ] Revenue model: Performance fee on vault profits (10%, capped at 30%)
+
+---
+
 ## License
 
 MIT © Arbix Team
