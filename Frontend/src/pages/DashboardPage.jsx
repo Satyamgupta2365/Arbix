@@ -388,7 +388,7 @@ const DashboardPage = () => {
 
                 {/* Pinned Assets — from Supabase */}
                 <div style={{ marginTop: '2rem' }}>
-                    <div className="assets-section-title">Top 10 Assets — Live from Supabase</div>
+                    <div className="assets-section-title">Top 10 Assets </div>
                     <div className="glass-grid">
                         {coins.map(coin => {
                             const sp = storedPrices[coin.symbol];
