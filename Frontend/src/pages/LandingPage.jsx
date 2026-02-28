@@ -253,10 +253,11 @@ const LandingPage = () => {
 
                             {/* Inner sphere */}
                             <motion.div
-                                animate={{ rotate: 360 }}
+                                initial={{ x: '-50%', y: '-50%', rotate: 0 }}
+                                animate={{ x: '-50%', y: '-50%', rotate: 360 }}
                                 transition={{ duration: 25, repeat: Infinity, ease: 'linear' }}
                                 style={{
-                                    position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)',
+                                    position: 'absolute', top: '50%', left: '50%',
                                     width: '140px', height: '140px', borderRadius: '50%',
                                     background: 'radial-gradient(circle at 35% 35%, rgba(252,213,53,0.3), rgba(252,213,53,0.05) 60%, transparent)',
                                     border: '1px solid rgba(252,213,53,0.15)',
@@ -271,12 +272,12 @@ const LandingPage = () => {
 
                             {/* Ring 1 — horizontal */}
                             <motion.div
-                                animate={{ rotate: 360 }}
+                                initial={{ x: '-50%', y: '-50%', rotateX: 75, rotateZ: 0 }}
+                                animate={{ x: '-50%', y: '-50%', rotateX: 75, rotateZ: 360 }}
                                 transition={{ duration: 12, repeat: Infinity, ease: 'linear' }}
                                 style={{
                                     position: 'absolute', top: '50%', left: '50%',
                                     width: '300px', height: '300px',
-                                    transform: 'translate(-50%, -50%) rotateX(75deg)',
                                     borderRadius: '50%',
                                     border: '1.5px solid rgba(252,213,53,0.2)',
                                     boxShadow: '0 0 15px rgba(252,213,53,0.05)',
@@ -285,12 +286,12 @@ const LandingPage = () => {
 
                             {/* Ring 2 — tilted */}
                             <motion.div
-                                animate={{ rotate: -360 }}
+                                initial={{ x: '-50%', y: '-50%', rotateX: 60, rotateY: 30, rotateZ: 0 }}
+                                animate={{ x: '-50%', y: '-50%', rotateX: 60, rotateY: 30, rotateZ: -360 }}
                                 transition={{ duration: 18, repeat: Infinity, ease: 'linear' }}
                                 style={{
                                     position: 'absolute', top: '50%', left: '50%',
                                     width: '350px', height: '350px',
-                                    transform: 'translate(-50%, -50%) rotateX(60deg) rotateY(30deg)',
                                     borderRadius: '50%',
                                     border: '1px solid rgba(252,213,53,0.12)',
                                 }}
@@ -298,12 +299,12 @@ const LandingPage = () => {
 
                             {/* Ring 3 — vertical */}
                             <motion.div
-                                animate={{ rotate: 360 }}
+                                initial={{ x: '-50%', y: '-50%', rotateY: 75, rotateZ: 0 }}
+                                animate={{ x: '-50%', y: '-50%', rotateY: 75, rotateZ: 360 }}
                                 transition={{ duration: 22, repeat: Infinity, ease: 'linear' }}
                                 style={{
                                     position: 'absolute', top: '50%', left: '50%',
                                     width: '280px', height: '280px',
-                                    transform: 'translate(-50%, -50%) rotateY(75deg)',
                                     borderRadius: '50%',
                                     border: '1px solid rgba(252,213,53,0.1)',
                                 }}
@@ -313,12 +314,12 @@ const LandingPage = () => {
                             {[0, 1, 2, 3].map(i => (
                                 <motion.div
                                     key={i}
-                                    animate={{ rotate: 360 }}
+                                    initial={{ x: '-50%', y: '-50%', rotateX: 60 + i * 15, rotateZ: i * 45 }}
+                                    animate={{ x: '-50%', y: '-50%', rotateX: 60 + i * 15, rotateZ: i * 45 + 360 }}
                                     transition={{ duration: 8 + i * 3, repeat: Infinity, ease: 'linear', delay: i * 0.5 }}
                                     style={{
                                         position: 'absolute', top: '50%', left: '50%',
                                         width: `${200 + i * 50}px`, height: `${200 + i * 50}px`,
-                                        transform: `translate(-50%, -50%) rotateX(${60 + i * 15}deg) rotateZ(${i * 45}deg)`,
                                     }}
                                 >
                                     <div style={{
