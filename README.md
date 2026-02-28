@@ -584,7 +584,7 @@ Arbix/
 
 ---
 
-## 🗺️ Roadmap
+## 🗺️ Roadmap — 6-Month Plan on BNB Chain
 
 ### Phase 1 — Hackathon (Current) ✅
 - [x] 5 oracle sources with real-time validation & cross-checking
@@ -596,25 +596,50 @@ Arbix/
 - [x] Realistic portfolio engine (35% spread capture, execution noise)
 - [x] 30+ REST API endpoints + live arbitrage simulator
 
-### Phase 2 — Testnet Validation (Q2 2026)
-- [ ] End-to-end on-chain execution via ArbixExecutor with real tokens
-- [ ] Vault deposit/withdraw flow (USDT/BNB)
-- [ ] PancakeSwap V3 concentrated liquidity integration
-- [ ] Contract verification + automated test suite
-- [ ] Multi-wallet agent support
+### Month 1–2 (Mar–Apr 2026) — Testnet Hardening
+- [ ] End-to-end on-chain arbitrage execution via ArbixExecutor with real testnet tokens
+- [ ] Vault deposit/withdraw flow (USDT/BNB) on BSC Testnet
+- [ ] Verify all 3 contracts on BSCScan with source code
+- [ ] Automated test suite (Hardhat + Chai) covering all contract functions
+- [ ] PancakeSwap V3 concentrated liquidity integration for tighter spreads
 
-### Phase 3 — Mainnet Launch (Q3 2026)
-- [ ] BSC Mainnet deployment with audited contracts
-- [ ] opBNB L2 integration for sub-cent gas costs
-- [ ] MEV protection via Flashbots-style bundling
-- [ ] Public vault launch for community depositors
+### Month 2–3 (Apr–May 2026) — Security & Audit
+- [ ] Third-party smart contract audit (CertiK / PeckShield)
+- [ ] Multi-wallet agent support for redundancy
+- [ ] Gas optimization — batch multiple arb executions into single transactions
+- [ ] Stress-test ML ensemble against 6 months of historical BSC DEX data
+- [ ] Closed beta: 10 whitelisted vault depositors on testnet
 
-### Phase 4 — Scale (Q4 2026)
+### Month 3–4 (May–Jun 2026) — BSC Mainnet Launch
+- [ ] Deploy audited contracts to BSC Mainnet
+- [ ] opBNB L2 integration for sub-cent gas costs on high-frequency trades
+- [ ] MEV protection via Flashbots-style private transaction bundling
+- [ ] Public vault — open deposits for community participants
+- [ ] BNB Greenfield integration for decentralized trade history storage
+
+### Month 4–5 (Jun–Jul 2026) — Expansion
+- [ ] 4 more DEX integrations: THENA V3, Wombat Exchange, Alpaca Finance, Venus Protocol
+- [ ] Cross-chain: BSC ↔ opBNB bridging for L1/L2 price differences
+- [ ] Telegram bot for real-time opportunity alerts
+- [ ] API tier for institutional traders and market makers
+- [ ] 🎯 Target: 50+ active vault depositors, $100K+ TVL
+
+### Month 5–6 (Jul–Aug 2026) — Scale & Governance
+- [ ] DAO governance (BEP-20 governance token) for vault parameter voting
 - [ ] Cross-chain: BSC ↔ Ethereum ↔ Solana bridge arbitrage
-- [ ] DAO governance for vault parameters & fee structure
-- [ ] Mobile app with push notifications
-- [ ] API tier for institutional traders
-- [ ] Revenue: 10% performance fee on vault profits (capped at 30%)
+- [ ] Mobile app with push notifications for high-confidence opportunities
+- [ ] Revenue model live: 10% performance fee on vault profits (capped at 30%)
+- [ ] 🎯 Target: $500K+ TVL, 200+ active users, self-sustaining revenue
+
+### 📊 6-Month Milestones
+
+| Metric | Now | Month 3 | Month 6 |
+|---|---|---|---|
+| **Contracts** | 3 on Testnet | 3 audited on Mainnet | 3+ on Mainnet + opBNB |
+| **DEX Integrations** | 4 (PCS, BiSwap, THENA, BabySwap) | 4 + PCS V3 | 8+ across BNB ecosystem |
+| **TVL** | $0 (testnet) | $10K+ (early depositors) | $500K+ |
+| **Users** | Demo | 10 beta testers | 200+ active |
+| **Chains** | BSC Testnet | BSC Mainnet | BSC + opBNB + cross-chain |
 
 ---
 
