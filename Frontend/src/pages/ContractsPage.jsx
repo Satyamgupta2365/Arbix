@@ -8,7 +8,7 @@ import {
 } from 'lucide-react';
 import Sidebar from '../components/Sidebar';
 
-const API = 'http://localhost:8000';
+const API = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
 const ContractsPage = () => {
     const [contracts, setContracts] = useState(null);

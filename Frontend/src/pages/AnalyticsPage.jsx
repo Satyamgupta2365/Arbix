@@ -10,7 +10,7 @@ import ArbixLogo from '../components/ArbixLogo';
 import Sidebar from '../components/Sidebar';
 import NetworkGraph from '../components/NetworkGraph';
 
-const API = 'http://localhost:8000';
+const API = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
 const AnalyticsPage = () => {
     const navigate = useNavigate();

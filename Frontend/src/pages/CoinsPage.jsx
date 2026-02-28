@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { createChart, ColorType } from 'lightweight-charts';
 import Sidebar from '../components/Sidebar';
 
-const API = 'http://localhost:8000';
+const API = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
 const SOURCE_COLORS = {
     binance: '#F0B90B',

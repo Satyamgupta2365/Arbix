@@ -211,7 +211,7 @@ const DashboardPage = () => {
         const loadData = async () => {
             const offset = getTzOffsetSeconds();
             try {
-                const res = await fetch(`http://localhost:8000/api/prices/chart/${selectedCoin}?interval=${chartInterval}&hours=24`);
+                const res = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/api/prices/chart/${selectedCoin}?interval=${chartInterval}&hours=24`);
                 const data = await res.json();
                 if (data && data.klines && data.klines.length > 0 && series) {
                     if (cType === 'candlestick') {

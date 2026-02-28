@@ -11,7 +11,7 @@ import ArbixLogo from '../components/ArbixLogo';
 import AnimatedCounter from '../components/AnimatedCounter';
 import LivePriceWidget from '../components/LivePriceWidget';
 
-const API = 'http://localhost:8000';
+const API = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
 /* ───── Animated gradient blob ───── */
 const GlowBlob = ({ color, size, top, left, delay = 0 }) => (
