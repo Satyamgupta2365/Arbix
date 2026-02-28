@@ -266,7 +266,7 @@ const AnalyticsPage = () => {
                                     {spreads.length} active spreads • {anomalyTotalCount} anomalies
                                 </span>
                             </h3>
-                            <NetworkGraph spreads={spreads} anomalies={anomalies} regime={regime} />
+                            <NetworkGraph spreads={spreads} anomalies={anomalies} anomalyTotalCount={anomalyTotalCount} regime={regime} />
                         </div>
 
                         {/* Top Spreads */}

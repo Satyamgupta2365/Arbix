@@ -12,7 +12,7 @@ const SOURCE_COLORS = {
     '1inch': '#1B314F',
 };
 
-const NetworkGraph = ({ spreads = [], anomalies = [], regime }) => {
+const NetworkGraph = ({ spreads = [], anomalies = [], anomalyTotalCount = 0, regime }) => {
     const W = 480, H = 400;
     const CX = W / 2, CY = H / 2;
     const R = 150; // radius of pentagon
@@ -49,7 +49,7 @@ const NetworkGraph = ({ spreads = [], anomalies = [], regime }) => {
         }).filter(Boolean);
     }, [spreads, nodes]);
 
-    const anomalyCount = anomalies.length;
+    const anomalyCount = anomalyTotalCount || anomalies.length;
     const regimeColor = {
         DISLOCATION: '#ff1744', VOLATILE: '#ff9100', RANGING: '#ffea00',
         TRENDING: '#00e676', CALM: '#40c4ff',
