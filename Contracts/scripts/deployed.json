@@ -1,20 +1,20 @@
 {
-  "network": "hardhat",
-  "chainId": 31337,
-  "deployer": "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
-  "deployedAt": "2026-02-27T16:26:56.722Z",
+  "network": "bscTestnet",
+  "chainId": 97,
+  "deployer": "0xcdc3d2ec640F8364ee9f58e7338Ed0e79f9001e0",
+  "deployedAt": "2026-02-28T07:01:38.456Z",
   "contracts": {
     "ArbixPriceOracle": {
-      "address": "0x5FbDB2315678afecb367f032d93F642f64180aa3",
-      "bscscan": "https://bscscan.com/address/0x5FbDB2315678afecb367f032d93F642f64180aa3"
+      "address": "0x73764D77B6736a2643Ea6fB773AeBb79FaFc7a83",
+      "bscscan": "https://testnet.bscscan.com/address/0x73764D77B6736a2643Ea6fB773AeBb79FaFc7a83"
     },
     "ArbixExecutor": {
-      "address": "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512",
-      "bscscan": "https://bscscan.com/address/0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512"
+      "address": "0x2df9e83a350027991170ab82a83FBD1836d76d3B",
+      "bscscan": "https://testnet.bscscan.com/address/0x2df9e83a350027991170ab82a83FBD1836d76d3B"
     },
     "ArbixVault": {
-      "address": "0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0",
-      "bscscan": "https://bscscan.com/address/0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0"
+      "address": "0xde18515788bd4bE6FA3C09AFd7957E1A47aEc307",
+      "bscscan": "https://testnet.bscscan.com/address/0xde18515788bd4bE6FA3C09AFd7957E1A47aEc307"
     }
   }
 }
