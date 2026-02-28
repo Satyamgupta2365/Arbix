@@ -49,12 +49,13 @@ const NotificationToast = () => {
         let isMounted = true;
         const connect = () => {
             if (!isMounted) return;
-            const ws = new WebSocket('ws://localhost:8000/ws/agent');
-            ws.onopen = () => {};
+            const wsBase = (import.meta.env.VITE_API_URL || 'http://localhost:8000').replace(/^http/, 'ws');
+            const ws = new WebSocket(`${wsBase}/ws/agent`);
+            ws.onopen = () => { };
             ws.onclose = () => {
                 if (isMounted) setTimeout(connect, 5000);
             };
-            ws.onerror = () => {};
+            ws.onerror = () => { };
             ws.onmessage = (e) => {
                 try {
                     const msg = JSON.parse(e.data);
@@ -72,7 +73,7 @@ const NotificationToast = () => {
                     if (msg.type === 'trade' && msg.data) {
                         addToast('trade', `Trade executed`, `${msg.data.symbol} — PnL: $${msg.data.pnl?.toFixed(2)}`);
                     }
-                } catch {}
+                } catch { }
             };
             wsRef.current = ws;
         };

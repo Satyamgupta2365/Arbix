@@ -106,7 +106,8 @@ const HeatmapPage = () => {
         const connect = () => {
             if (!isMounted) return;
             try {
-                const ws = new WebSocket('ws://localhost:8000/ws/spreads');
+                const wsBase = (import.meta.env.VITE_API_URL || 'http://localhost:8000').replace(/^http/, 'ws');
+                const ws = new WebSocket(`${wsBase}/ws/spreads`);
                 ws.onopen = () => { if (isMounted) setWsConnected(true); };
                 ws.onclose = () => {
                     if (isMounted) {

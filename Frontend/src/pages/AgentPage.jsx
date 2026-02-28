@@ -62,7 +62,8 @@ const AgentPage = () => {
         let isMounted = true;
         const connect = () => {
             if (!isMounted) return;
-            const ws = new WebSocket('ws://localhost:8000/ws/agent');
+            const wsBase = (import.meta.env.VITE_API_URL || 'http://localhost:8000').replace(/^http/, 'ws');
+            const ws = new WebSocket(`${wsBase}/ws/agent`);
             ws.onopen = () => { if (isMounted) setWsConnected(true); };
             ws.onclose = () => {
                 if (isMounted) {
@@ -70,7 +71,7 @@ const AgentPage = () => {
                     setTimeout(connect, 3000);
                 }
             };
-            ws.onerror = () => {}; // suppress console errors
+            ws.onerror = () => { }; // suppress console errors
             ws.onmessage = (e) => {
                 try {
                     const msg = JSON.parse(e.data);
@@ -82,7 +83,7 @@ const AgentPage = () => {
                     if (msg.type === 'state_change' || msg.type === 'scan_complete') {
                         setActivity(prev => [msg, ...prev].slice(0, 40));
                     }
-                } catch {}
+                } catch { }
             };
             wsRef.current = ws;
         };
@@ -298,18 +299,18 @@ const OverviewTab = ({ activity, spreads, anomalies }) => (
                 {anomalies.slice(0, 10).map((a, i) => {
                     const sev = (a.severity || '').toLowerCase();
                     return (
-                    <div key={i} style={{
-                        padding: '0.6rem 0.9rem', borderRadius: '0.5rem',
-                        background: sev === 'high' ? 'rgba(255,23,68,0.12)' :
-                                    (sev === 'medium' || sev === 'moderate') ? 'rgba(255,171,64,0.12)' : 'rgba(64,196,255,0.12)',
-                        border: `1px solid ${sev === 'high' ? 'rgba(255,23,68,0.3)' :
-                                              (sev === 'medium' || sev === 'moderate') ? 'rgba(255,171,64,0.3)' : 'rgba(64,196,255,0.3)'}`,
-                    }}>
-                        <div style={{ fontWeight: 700, fontSize: '0.8rem' }}>{a.symbol?.replace('USDT', '')} — {a.type}</div>
-                        <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '0.2rem' }}>
-                            {a.description?.slice(0, 80) || `z-score: ${a.z_score?.toFixed(2)}`}
+                        <div key={i} style={{
+                            padding: '0.6rem 0.9rem', borderRadius: '0.5rem',
+                            background: sev === 'high' ? 'rgba(255,23,68,0.12)' :
+                                (sev === 'medium' || sev === 'moderate') ? 'rgba(255,171,64,0.12)' : 'rgba(64,196,255,0.12)',
+                            border: `1px solid ${sev === 'high' ? 'rgba(255,23,68,0.3)' :
+                                (sev === 'medium' || sev === 'moderate') ? 'rgba(255,171,64,0.3)' : 'rgba(64,196,255,0.3)'}`,
+                        }}>
+                            <div style={{ fontWeight: 700, fontSize: '0.8rem' }}>{a.symbol?.replace('USDT', '')} — {a.type}</div>
+                            <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '0.2rem' }}>
+                                {a.description?.slice(0, 80) || `z-score: ${a.z_score?.toFixed(2)}`}
+                            </div>
                         </div>
-                    </div>
                     );
                 })}
                 {anomalies.length === 0 && (
@@ -348,124 +349,124 @@ const OpportunitiesTab = ({ opportunities }) => {
     };
 
     return (
-    <div className="glass-card" style={{ padding: '1.2rem' }}>
-        <h3 style={{ fontSize: '0.95rem', fontWeight: 800, marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <Target size={16} style={{ color: '#ffd740' }} /> Detected Arbitrage Opportunities ({opportunities.length})
-        </h3>
+        <div className="glass-card" style={{ padding: '1.2rem' }}>
+            <h3 style={{ fontSize: '0.95rem', fontWeight: 800, marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <Target size={16} style={{ color: '#ffd740' }} /> Detected Arbitrage Opportunities ({opportunities.length})
+            </h3>
 
-        {/* Execution result banner */}
-        {execResult && (
-            <motion.div
-                initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}
-                style={{
-                    padding: '0.8rem 1rem', borderRadius: '0.5rem', marginBottom: '1rem',
-                    background: execResult.status === 'executed' ? 'rgba(105,240,174,0.1)' : 'rgba(255,171,64,0.1)',
-                    border: `1px solid ${execResult.status === 'executed' ? 'rgba(105,240,174,0.3)' : 'rgba(255,171,64,0.3)'}`,
-                    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                }}
-            >
-                <div>
-                    <span style={{
-                        fontWeight: 800, fontSize: '0.85rem',
-                        color: execResult.status === 'executed' ? '#69f0ae' : '#ffab40',
-                    }}>
-                        {execResult.status === 'executed' ? '✅ Trade Executed' : `⚡ ${execResult.status || 'Processed'}`}
-                    </span>
-                    {execResult.trade && (
-                        <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginLeft: '0.8rem' }}>
-                            P&L: <strong style={{ color: (execResult.trade.pnl || 0) >= 0 ? '#69f0ae' : '#ff5252' }}>
-                                {execResult.trade.pnl >= 0 ? '+' : ''}${execResult.trade.pnl?.toFixed(2)}
-                            </strong> • {execResult.trade.symbol}
+            {/* Execution result banner */}
+            {execResult && (
+                <motion.div
+                    initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}
+                    style={{
+                        padding: '0.8rem 1rem', borderRadius: '0.5rem', marginBottom: '1rem',
+                        background: execResult.status === 'executed' ? 'rgba(105,240,174,0.1)' : 'rgba(255,171,64,0.1)',
+                        border: `1px solid ${execResult.status === 'executed' ? 'rgba(105,240,174,0.3)' : 'rgba(255,171,64,0.3)'}`,
+                        display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                    }}
+                >
+                    <div>
+                        <span style={{
+                            fontWeight: 800, fontSize: '0.85rem',
+                            color: execResult.status === 'executed' ? '#69f0ae' : '#ffab40',
+                        }}>
+                            {execResult.status === 'executed' ? '✅ Trade Executed' : `⚡ ${execResult.status || 'Processed'}`}
                         </span>
-                    )}
-                    {execResult.message && (
-                        <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginLeft: '0.8rem' }}>
-                            {execResult.message}
-                        </span>
-                    )}
-                </div>
-                <button onClick={() => setExecResult(null)} style={{
-                    background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: '1rem',
-                }}>×</button>
-            </motion.div>
-        )}
-
-        <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8rem' }}>
-                <thead>
-                    <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
-                        {['#', 'Type', 'Pair', 'Buy @', 'Sell @', 'Gross %', 'Net %', 'Route', 'Time', ''].map(h => (
-                            <th key={h} style={{ padding: '0.6rem 0.5rem', textAlign: 'left', color: 'var(--text-muted)', fontWeight: 600 }}>{h}</th>
-                        ))}
-                    </tr>
-                </thead>
-                <tbody>
-                    {opportunities.map((o, i) => {
-                        const buyStep = o.path?.find(p => p.action === 'BUY');
-                        const sellStep = o.path?.find(p => p.action === 'SELL');
-                        const sym = (o.symbols || []).map(s => s.replace('USDT', '')).join('/');
-                        const isProfitable = (o.net_profit_pct || 0) > 0;
-                        const isExec = executing === o.id;
-                        return (
-                        <tr key={o.id || i} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
-                            <td style={{ padding: '0.6rem 0.5rem', fontFamily: 'var(--mono)', fontSize: '0.7rem' }}>{o.id?.split('-').pop()}</td>
-                            <td style={{ padding: '0.6rem 0.5rem' }}>
-                                <span style={{
-                                    padding: '0.15rem 0.5rem', borderRadius: '0.3rem', fontSize: '0.7rem', fontWeight: 700,
-                                    background: o.type === 'triangular' ? 'rgba(124,77,255,0.2)' :
-                                                o.type === 'cross_chain' ? 'rgba(255,171,64,0.2)' : 'rgba(64,196,255,0.2)',
-                                    color: o.type === 'triangular' ? '#b388ff' :
-                                           o.type === 'cross_chain' ? '#ffab40' : '#40c4ff',
-                                }}>
-                                    {o.type}
-                                </span>
-                            </td>
-                            <td style={{ padding: '0.6rem 0.5rem', fontWeight: 700 }}>{sym || '—'}</td>
-                            <td style={{ padding: '0.6rem 0.5rem', fontFamily: 'var(--mono)' }}>${buyStep?.price?.toLocaleString(undefined, {maximumFractionDigits: 4}) || '—'}</td>
-                            <td style={{ padding: '0.6rem 0.5rem', fontFamily: 'var(--mono)' }}>${sellStep?.price?.toLocaleString(undefined, {maximumFractionDigits: 4}) || '—'}</td>
-                            <td style={{
-                                padding: '0.6rem 0.5rem', fontFamily: 'var(--mono)', fontWeight: 700,
-                                color: (o.gross_spread_pct || 0) > 0 ? '#69f0ae' : '#ff5252',
-                            }}>{o.gross_spread_pct?.toFixed(4)}%</td>
-                            <td style={{
-                                padding: '0.6rem 0.5rem', fontFamily: 'var(--mono)', fontWeight: 800,
-                                color: (o.net_profit_pct || 0) > 0 ? '#69f0ae' : '#ff5252',
-                            }}>{o.net_profit_pct?.toFixed(4)}%</td>
-                            <td style={{ padding: '0.6rem 0.5rem', fontSize: '0.7rem', color: 'var(--text-muted)' }}>
-                                {(o.sources || []).join(' → ')}
-                            </td>
-                            <td style={{ padding: '0.6rem 0.5rem', fontSize: '0.7rem', fontFamily: 'var(--mono)', color: 'var(--text-muted)' }}>
-                                {o.timestamp ? new Date(o.timestamp * 1000).toLocaleTimeString() : ''}
-                            </td>
-                            <td style={{ padding: '0.6rem 0.3rem' }}>
-                                {isProfitable && (
-                                    <button
-                                        onClick={() => executeOpp(o)}
-                                        disabled={isExec}
-                                        style={{
-                                            padding: '0.3rem 0.7rem', borderRadius: '0.4rem', border: 'none',
-                                            background: isExec ? 'rgba(252,213,53,0.3)' : 'linear-gradient(135deg, #FCD535, #f0b90b)',
-                                            color: '#000', fontWeight: 800, fontSize: '0.65rem', cursor: isExec ? 'wait' : 'pointer',
-                                            display: 'flex', alignItems: 'center', gap: '0.3rem', whiteSpace: 'nowrap',
-                                        }}
-                                    >
-                                        <Zap size={10} /> {isExec ? 'Executing...' : 'Execute'}
-                                    </button>
-                                )}
-                            </td>
-                        </tr>
-                        );
-                    })}
-                </tbody>
-            </table>
-            {opportunities.length === 0 && (
-                <div style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '3rem', fontSize: '0.9rem' }}>
-                    <Target size={32} style={{ opacity: 0.3, marginBottom: '0.5rem' }} /><br />
-                    No opportunities detected yet — agent is scanning...
-                </div>
+                        {execResult.trade && (
+                            <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginLeft: '0.8rem' }}>
+                                P&L: <strong style={{ color: (execResult.trade.pnl || 0) >= 0 ? '#69f0ae' : '#ff5252' }}>
+                                    {execResult.trade.pnl >= 0 ? '+' : ''}${execResult.trade.pnl?.toFixed(2)}
+                                </strong> • {execResult.trade.symbol}
+                            </span>
+                        )}
+                        {execResult.message && (
+                            <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginLeft: '0.8rem' }}>
+                                {execResult.message}
+                            </span>
+                        )}
+                    </div>
+                    <button onClick={() => setExecResult(null)} style={{
+                        background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: '1rem',
+                    }}>×</button>
+                </motion.div>
             )}
+
+            <div style={{ overflowX: 'auto' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8rem' }}>
+                    <thead>
+                        <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
+                            {['#', 'Type', 'Pair', 'Buy @', 'Sell @', 'Gross %', 'Net %', 'Route', 'Time', ''].map(h => (
+                                <th key={h} style={{ padding: '0.6rem 0.5rem', textAlign: 'left', color: 'var(--text-muted)', fontWeight: 600 }}>{h}</th>
+                            ))}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {opportunities.map((o, i) => {
+                            const buyStep = o.path?.find(p => p.action === 'BUY');
+                            const sellStep = o.path?.find(p => p.action === 'SELL');
+                            const sym = (o.symbols || []).map(s => s.replace('USDT', '')).join('/');
+                            const isProfitable = (o.net_profit_pct || 0) > 0;
+                            const isExec = executing === o.id;
+                            return (
+                                <tr key={o.id || i} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+                                    <td style={{ padding: '0.6rem 0.5rem', fontFamily: 'var(--mono)', fontSize: '0.7rem' }}>{o.id?.split('-').pop()}</td>
+                                    <td style={{ padding: '0.6rem 0.5rem' }}>
+                                        <span style={{
+                                            padding: '0.15rem 0.5rem', borderRadius: '0.3rem', fontSize: '0.7rem', fontWeight: 700,
+                                            background: o.type === 'triangular' ? 'rgba(124,77,255,0.2)' :
+                                                o.type === 'cross_chain' ? 'rgba(255,171,64,0.2)' : 'rgba(64,196,255,0.2)',
+                                            color: o.type === 'triangular' ? '#b388ff' :
+                                                o.type === 'cross_chain' ? '#ffab40' : '#40c4ff',
+                                        }}>
+                                            {o.type}
+                                        </span>
+                                    </td>
+                                    <td style={{ padding: '0.6rem 0.5rem', fontWeight: 700 }}>{sym || '—'}</td>
+                                    <td style={{ padding: '0.6rem 0.5rem', fontFamily: 'var(--mono)' }}>${buyStep?.price?.toLocaleString(undefined, { maximumFractionDigits: 4 }) || '—'}</td>
+                                    <td style={{ padding: '0.6rem 0.5rem', fontFamily: 'var(--mono)' }}>${sellStep?.price?.toLocaleString(undefined, { maximumFractionDigits: 4 }) || '—'}</td>
+                                    <td style={{
+                                        padding: '0.6rem 0.5rem', fontFamily: 'var(--mono)', fontWeight: 700,
+                                        color: (o.gross_spread_pct || 0) > 0 ? '#69f0ae' : '#ff5252',
+                                    }}>{o.gross_spread_pct?.toFixed(4)}%</td>
+                                    <td style={{
+                                        padding: '0.6rem 0.5rem', fontFamily: 'var(--mono)', fontWeight: 800,
+                                        color: (o.net_profit_pct || 0) > 0 ? '#69f0ae' : '#ff5252',
+                                    }}>{o.net_profit_pct?.toFixed(4)}%</td>
+                                    <td style={{ padding: '0.6rem 0.5rem', fontSize: '0.7rem', color: 'var(--text-muted)' }}>
+                                        {(o.sources || []).join(' → ')}
+                                    </td>
+                                    <td style={{ padding: '0.6rem 0.5rem', fontSize: '0.7rem', fontFamily: 'var(--mono)', color: 'var(--text-muted)' }}>
+                                        {o.timestamp ? new Date(o.timestamp * 1000).toLocaleTimeString() : ''}
+                                    </td>
+                                    <td style={{ padding: '0.6rem 0.3rem' }}>
+                                        {isProfitable && (
+                                            <button
+                                                onClick={() => executeOpp(o)}
+                                                disabled={isExec}
+                                                style={{
+                                                    padding: '0.3rem 0.7rem', borderRadius: '0.4rem', border: 'none',
+                                                    background: isExec ? 'rgba(252,213,53,0.3)' : 'linear-gradient(135deg, #FCD535, #f0b90b)',
+                                                    color: '#000', fontWeight: 800, fontSize: '0.65rem', cursor: isExec ? 'wait' : 'pointer',
+                                                    display: 'flex', alignItems: 'center', gap: '0.3rem', whiteSpace: 'nowrap',
+                                                }}
+                                            >
+                                                <Zap size={10} /> {isExec ? 'Executing...' : 'Execute'}
+                                            </button>
+                                        )}
+                                    </td>
+                                </tr>
+                            );
+                        })}
+                    </tbody>
+                </table>
+                {opportunities.length === 0 && (
+                    <div style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '3rem', fontSize: '0.9rem' }}>
+                        <Target size={32} style={{ opacity: 0.3, marginBottom: '0.5rem' }} /><br />
+                        No opportunities detected yet — agent is scanning...
+                    </div>
+                )}
+            </div>
         </div>
-    </div>
     );
 };
 
@@ -493,97 +494,97 @@ const DecisionsTab = ({ decisions }) => (
                     : [];
 
                 return (
-                <motion.div key={d.decision_id || i}
-                    initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: i * 0.03 }}
-                    style={{
-                        padding: '1rem', borderRadius: '0.6rem',
-                        background: isExec ? 'rgba(105,240,174,0.06)' : 'rgba(255,82,82,0.06)',
-                        border: `1px solid ${isExec ? 'rgba(105,240,174,0.15)' : 'rgba(255,82,82,0.15)'}`,
-                    }}>
-                    {/* Header row */}
-                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem', flexWrap: 'wrap', gap: '0.4rem' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
-                            <span style={{
-                                padding: '0.15rem 0.5rem', borderRadius: '0.3rem', fontSize: '0.7rem', fontWeight: 800,
-                                background: isExec ? 'rgba(105,240,174,0.2)' : 'rgba(255,82,82,0.2)',
-                                color: isExec ? '#69f0ae' : '#ff5252',
-                            }}>{d.decision}</span>
-                            <span style={{ fontWeight: 700, fontSize: '0.85rem' }}>{syms}</span>
-                            <span style={{ color: 'var(--text-muted)', fontSize: '0.7rem' }}>{d.opportunity_type}</span>
-                        </div>
-                        <span style={{ fontSize: '0.65rem', fontFamily: 'var(--mono)', color: 'var(--text-muted)' }}>
-                            {d.decision_id}
-                        </span>
-                    </div>
-
-                    {/* Verdict */}
-                    <div style={{ fontSize: '0.75rem', marginBottom: '0.4rem', color: isExec ? '#69f0ae' : '#ffab40' }}>
-                        {d.verdict}
-                    </div>
-
-                    {/* Scores */}
-                    <div style={{ display: 'flex', gap: '1.5rem', marginBottom: '0.5rem', fontSize: '0.78rem', flexWrap: 'wrap' }}>
-                        <span>Confidence: <strong style={{ color: '#40c4ff' }}>{d.confidence}</strong>/100</span>
-                        <span>Risk: <strong style={{ color: '#ff5252' }}>{d.risk}</strong>/100</span>
-                        <span>Net: <strong style={{ color: '#ffd740', fontFamily: 'var(--mono)' }}>{netPct}</strong></span>
-                        <span>Kelly: <strong style={{ fontFamily: 'var(--mono)' }}>{kellyPct}</strong></span>
-                        <span>Size: <strong style={{ fontFamily: 'var(--mono)', color: '#b388ff' }}>{d.position_sizing?.recommended_size_usd || '—'}</strong></span>
-                    </div>
-
-                    {/* ML Analysis Badge */}
-                    {d.ml_analysis && (
-                        <div style={{ display: 'flex', gap: '0.6rem', marginBottom: '0.5rem', flexWrap: 'wrap' }}>
-                            {d.ml_analysis.algorithm_agreement && (
-                                <span style={{
-                                    padding: '0.15rem 0.5rem', borderRadius: '0.3rem', fontSize: '0.65rem', fontWeight: 700,
-                                    background: d.ml_analysis.algorithm_agreement.agreement_pct > 60 ? 'rgba(105,240,174,0.15)' : 'rgba(255,171,64,0.15)',
-                                    color: d.ml_analysis.algorithm_agreement.agreement_pct > 60 ? '#69f0ae' : '#ffab40',
-                                }}>
-                                    🧠 {d.ml_analysis.algorithm_agreement.bullish_models}/{d.ml_analysis.algorithm_agreement.total_models} models agree ({d.ml_analysis.algorithm_agreement.agreement_pct}%)
-                                </span>
-                            )}
-                            {d.ml_analysis.bayesian_calibration && (
-                                <span style={{
-                                    padding: '0.15rem 0.5rem', borderRadius: '0.3rem', fontSize: '0.65rem', fontWeight: 700,
-                                    background: 'rgba(64,196,255,0.12)', color: '#40c4ff',
-                                }}>
-                                    📊 Bayesian: {d.ml_analysis.bayesian_calibration.raw_input?.toFixed(0)} → {d.ml_analysis.bayesian_calibration.calibrated_output?.toFixed(0)}
-                                </span>
-                            )}
-                            {d.ml_analysis.raw_confidence != null && d.ml_analysis.legacy_confidence != null && (
-                                <span style={{
-                                    padding: '0.15rem 0.5rem', borderRadius: '0.3rem', fontSize: '0.65rem', fontWeight: 700,
-                                    background: 'rgba(179,136,255,0.12)', color: '#b388ff',
-                                }}>
-                                    Legacy: {d.ml_analysis.legacy_confidence} vs ML: {d.ml_analysis.raw_confidence?.toFixed(0)}
-                                </span>
-                            )}
-                        </div>
-                    )}
-
-                    {/* Execution Path + Reasoning */}
-                    {d.execution_path && d.execution_path.length > 0 && (
-                        <div style={{
-                            padding: '0.6rem', borderRadius: '0.4rem', background: 'rgba(0,0,0,0.3)',
-                            fontSize: '0.72rem', color: 'var(--text-secondary)', fontFamily: 'var(--mono)',
-                            lineHeight: 1.6, marginTop: '0.3rem',
+                    <motion.div key={d.decision_id || i}
+                        initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }}
+                        transition={{ delay: i * 0.03 }}
+                        style={{
+                            padding: '1rem', borderRadius: '0.6rem',
+                            background: isExec ? 'rgba(105,240,174,0.06)' : 'rgba(255,82,82,0.06)',
+                            border: `1px solid ${isExec ? 'rgba(105,240,174,0.15)' : 'rgba(255,82,82,0.15)'}`,
                         }}>
-                            {d.execution_path.map((step, j) => (
-                                <div key={j}>{step}</div>
-                            ))}
-                            {d.reasoning?.primary_reason && (
-                                <div style={{ marginTop: '0.3rem', color: '#ffd740' }}>💡 {d.reasoning.primary_reason}</div>
-                            )}
-                            {/* Render risk_factors as object entries */}
-                            {riskEntries.map(([key, val]) => (
-                                <div key={key} style={{ color: '#ff8a80' }}>
-                                    ⚠ {key.replace(/_/g, ' ')}: {typeof val === 'object' ? val.label || `score ${val.score}` : val}
-                                </div>
-                            ))}
+                        {/* Header row */}
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem', flexWrap: 'wrap', gap: '0.4rem' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                                <span style={{
+                                    padding: '0.15rem 0.5rem', borderRadius: '0.3rem', fontSize: '0.7rem', fontWeight: 800,
+                                    background: isExec ? 'rgba(105,240,174,0.2)' : 'rgba(255,82,82,0.2)',
+                                    color: isExec ? '#69f0ae' : '#ff5252',
+                                }}>{d.decision}</span>
+                                <span style={{ fontWeight: 700, fontSize: '0.85rem' }}>{syms}</span>
+                                <span style={{ color: 'var(--text-muted)', fontSize: '0.7rem' }}>{d.opportunity_type}</span>
+                            </div>
+                            <span style={{ fontSize: '0.65rem', fontFamily: 'var(--mono)', color: 'var(--text-muted)' }}>
+                                {d.decision_id}
+                            </span>
                         </div>
-                    )}
-                </motion.div>
+
+                        {/* Verdict */}
+                        <div style={{ fontSize: '0.75rem', marginBottom: '0.4rem', color: isExec ? '#69f0ae' : '#ffab40' }}>
+                            {d.verdict}
+                        </div>
+
+                        {/* Scores */}
+                        <div style={{ display: 'flex', gap: '1.5rem', marginBottom: '0.5rem', fontSize: '0.78rem', flexWrap: 'wrap' }}>
+                            <span>Confidence: <strong style={{ color: '#40c4ff' }}>{d.confidence}</strong>/100</span>
+                            <span>Risk: <strong style={{ color: '#ff5252' }}>{d.risk}</strong>/100</span>
+                            <span>Net: <strong style={{ color: '#ffd740', fontFamily: 'var(--mono)' }}>{netPct}</strong></span>
+                            <span>Kelly: <strong style={{ fontFamily: 'var(--mono)' }}>{kellyPct}</strong></span>
+                            <span>Size: <strong style={{ fontFamily: 'var(--mono)', color: '#b388ff' }}>{d.position_sizing?.recommended_size_usd || '—'}</strong></span>
+                        </div>
+
+                        {/* ML Analysis Badge */}
+                        {d.ml_analysis && (
+                            <div style={{ display: 'flex', gap: '0.6rem', marginBottom: '0.5rem', flexWrap: 'wrap' }}>
+                                {d.ml_analysis.algorithm_agreement && (
+                                    <span style={{
+                                        padding: '0.15rem 0.5rem', borderRadius: '0.3rem', fontSize: '0.65rem', fontWeight: 700,
+                                        background: d.ml_analysis.algorithm_agreement.agreement_pct > 60 ? 'rgba(105,240,174,0.15)' : 'rgba(255,171,64,0.15)',
+                                        color: d.ml_analysis.algorithm_agreement.agreement_pct > 60 ? '#69f0ae' : '#ffab40',
+                                    }}>
+                                        🧠 {d.ml_analysis.algorithm_agreement.bullish_models}/{d.ml_analysis.algorithm_agreement.total_models} models agree ({d.ml_analysis.algorithm_agreement.agreement_pct}%)
+                                    </span>
+                                )}
+                                {d.ml_analysis.bayesian_calibration && (
+                                    <span style={{
+                                        padding: '0.15rem 0.5rem', borderRadius: '0.3rem', fontSize: '0.65rem', fontWeight: 700,
+                                        background: 'rgba(64,196,255,0.12)', color: '#40c4ff',
+                                    }}>
+                                        📊 Bayesian: {d.ml_analysis.bayesian_calibration.raw_input?.toFixed(0)} → {d.ml_analysis.bayesian_calibration.calibrated_output?.toFixed(0)}
+                                    </span>
+                                )}
+                                {d.ml_analysis.raw_confidence != null && d.ml_analysis.legacy_confidence != null && (
+                                    <span style={{
+                                        padding: '0.15rem 0.5rem', borderRadius: '0.3rem', fontSize: '0.65rem', fontWeight: 700,
+                                        background: 'rgba(179,136,255,0.12)', color: '#b388ff',
+                                    }}>
+                                        Legacy: {d.ml_analysis.legacy_confidence} vs ML: {d.ml_analysis.raw_confidence?.toFixed(0)}
+                                    </span>
+                                )}
+                            </div>
+                        )}
+
+                        {/* Execution Path + Reasoning */}
+                        {d.execution_path && d.execution_path.length > 0 && (
+                            <div style={{
+                                padding: '0.6rem', borderRadius: '0.4rem', background: 'rgba(0,0,0,0.3)',
+                                fontSize: '0.72rem', color: 'var(--text-secondary)', fontFamily: 'var(--mono)',
+                                lineHeight: 1.6, marginTop: '0.3rem',
+                            }}>
+                                {d.execution_path.map((step, j) => (
+                                    <div key={j}>{step}</div>
+                                ))}
+                                {d.reasoning?.primary_reason && (
+                                    <div style={{ marginTop: '0.3rem', color: '#ffd740' }}>💡 {d.reasoning.primary_reason}</div>
+                                )}
+                                {/* Render risk_factors as object entries */}
+                                {riskEntries.map(([key, val]) => (
+                                    <div key={key} style={{ color: '#ff8a80' }}>
+                                        ⚠ {key.replace(/_/g, ' ')}: {typeof val === 'object' ? val.label || `score ${val.score}` : val}
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </motion.div>
                 );
             })}
             {decisions.length === 0 && (

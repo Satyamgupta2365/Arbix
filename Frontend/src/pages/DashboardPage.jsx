@@ -117,7 +117,8 @@ const DashboardPage = () => {
     useEffect(() => {
         if (!selectedCoin) return;
 
-        const ws = new WebSocket(`ws://localhost:8000/ws/trading/${selectedCoin}`);
+        const wsBase = (import.meta.env.VITE_API_URL || 'http://localhost:8000').replace(/^http/, 'ws');
+        const ws = new WebSocket(`${wsBase}/ws/trading/${selectedCoin}`);
         wsRef.current = ws;
         ws.onmessage = (event) => {
             try {
