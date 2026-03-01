@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 const AnimatedCounter = ({ end, prefix = '', suffix = '', decimals = 0, duration = 2000 }) => {
     const [count, setCount] = useState(0);

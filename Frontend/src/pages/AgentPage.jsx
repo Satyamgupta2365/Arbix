@@ -1,11 +1,17 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import {
-    LayoutDashboard, BarChart3, Search, Brain, Target,
-    Zap, Shield, Clock, RefreshCw, Activity, Layers, LineChart
-} from 'lucide-react';
 import { motion } from 'framer-motion';
-import ArbixLogo from '../components/ArbixLogo';
+import {
+    Activity,
+    Brain,
+    Clock,
+    Layers, LineChart,
+    RefreshCw,
+    Search,
+    Shield,
+    Target,
+    Zap
+} from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import Sidebar from '../components/Sidebar';
 
 const API = import.meta.env.VITE_API_URL || 'http://localhost:8000';

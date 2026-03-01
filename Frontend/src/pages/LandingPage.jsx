@@ -1,14 +1,24 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
-import {
-    Zap, ArrowRight, ChevronRight, TrendingUp,
-    Target, Brain, Shield, Eye, Activity, ExternalLink,
-    GitBranch, Radio, Sparkles, Bot, Radar, Wallet,
-    Star, ArrowUpRight, Play, CheckCircle
-} from 'lucide-react';
 import { motion, useScroll, useTransform } from 'framer-motion';
-import ArbixLogo from '../components/ArbixLogo';
+import {
+    Activity,
+    ArrowRight,
+    ArrowUpRight,
+    Bot,
+    Brain,
+    ChevronRight,
+    Eye,
+    GitBranch,
+    Play,
+    Radar,
+    Radio, Sparkles,
+    Star,
+    Wallet,
+    Zap
+} from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import AnimatedCounter from '../components/AnimatedCounter';
+import ArbixLogo from '../components/ArbixLogo';
 import LivePriceWidget from '../components/LivePriceWidget';
 
 const API = import.meta.env.VITE_API_URL || 'http://localhost:8000';

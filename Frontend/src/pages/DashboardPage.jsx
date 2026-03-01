@@ -1,14 +1,13 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { Link } from 'react-router-dom';
-import { createChart, ColorType } from 'lightweight-charts';
+import { AnimatePresence, motion } from 'framer-motion';
+import { ColorType, createChart } from 'lightweight-charts';
 import {
-    LayoutDashboard, BarChart3, Search, Globe, Clock,
-    Brain, Target, Wallet, Settings
+    Clock,
+    Globe,
+    Search
 } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { supabase } from '../supabaseClient';
-import ArbixLogo from '../components/ArbixLogo';
+import { useEffect, useRef, useState } from 'react';
 import Sidebar from '../components/Sidebar';
+import { supabase } from '../supabaseClient';
 
 const DashboardPage = () => {
     const [selectedCoin, setSelectedCoin] = useState('BTCUSDT');

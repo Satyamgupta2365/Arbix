@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { Zap, Target, AlertTriangle, Brain, X, TrendingUp } from 'lucide-react';
+import { AnimatePresence, motion } from 'framer-motion';
+import { AlertTriangle, Brain, Target, TrendingUp, X, Zap } from 'lucide-react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 const TOAST_DURATION = 5000;
 

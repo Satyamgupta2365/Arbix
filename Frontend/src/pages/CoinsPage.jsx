@@ -1,7 +1,7 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { RefreshCw, TrendingUp, TrendingDown, ArrowRight, Zap, Eye, X, BarChart3, Activity, Layers, Search } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { createChart, ColorType } from 'lightweight-charts';
+import { AnimatePresence, motion } from 'framer-motion';
+import { ColorType, createChart } from 'lightweight-charts';
+import { BarChart3, Eye, RefreshCw, Search, TrendingDown, TrendingUp, X, Zap } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
 import Sidebar from '../components/Sidebar';
 
 const API = import.meta.env.VITE_API_URL || 'http://localhost:8000';

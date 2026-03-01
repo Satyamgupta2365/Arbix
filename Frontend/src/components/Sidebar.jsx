@@ -1,8 +1,14 @@
-import React from 'react';
-import { Link } from 'react-router-dom';
 import {
-    LayoutDashboard, BarChart3, Brain, Target, Wallet, Settings, Activity, FileCode2, History, Grid3X3
+    Activity,
+    BarChart3, Brain,
+    FileCode2,
+    Grid3X3,
+    History,
+    LayoutDashboard,
+    Settings,
+    Target, Wallet
 } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import ArbixLogo from './ArbixLogo';
 
 const Sidebar = ({ active = 'dashboard', topCoins = [], selectedCoin, onSelectCoin }) => {

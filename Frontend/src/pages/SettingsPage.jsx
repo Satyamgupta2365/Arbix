@@ -1,12 +1,21 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { AnimatePresence, motion } from 'framer-motion';
 import {
-    LayoutDashboard, BarChart3, Brain, Activity, Settings,
-    Sliders, Cpu, Shield, Zap, Clock, DollarSign, AlertTriangle,
-    RefreshCw, Check, ChevronRight, Box, Fuel, Hash, Server
+    AlertTriangle,
+    Box,
+    Check,
+    Clock,
+    Cpu,
+    DollarSign,
+    Fuel, Hash,
+    RefreshCw,
+    Server,
+    Settings,
+    Shield,
+    Sliders,
+    Zap
 } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
-import ArbixLogo from '../components/ArbixLogo';
+import { useCallback, useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import Sidebar from '../components/Sidebar';
 
 const API = import.meta.env.VITE_API_URL || 'http://localhost:8000';

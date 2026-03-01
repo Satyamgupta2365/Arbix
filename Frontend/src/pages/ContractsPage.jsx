@@ -1,11 +1,23 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { AnimatePresence, motion } from 'framer-motion';
 import {
-    FileCode2, Shield, Zap, Eye, ChevronDown, ChevronRight,
-    Copy, ExternalLink, Activity, Lock, Cpu, ArrowRightLeft,
-    TrendingUp, AlertTriangle, CheckCircle2, Database, Layers,
-    RefreshCw, DollarSign, Wallet
+    AlertTriangle,
+    ArrowRightLeft,
+    CheckCircle2,
+    ChevronDown, ChevronRight,
+    Copy,
+    Cpu,
+    Database,
+    ExternalLink,
+    Eye,
+    FileCode2,
+    Layers,
+    Lock,
+    RefreshCw,
+    Shield,
+    Wallet,
+    Zap
 } from 'lucide-react';
+import { useCallback, useEffect, useState } from 'react';
 import Sidebar from '../components/Sidebar';
 
 const API = import.meta.env.VITE_API_URL || 'http://localhost:8000';

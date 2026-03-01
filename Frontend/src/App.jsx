@@ -1,15 +1,14 @@
-import React from 'react';
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
-import LandingPage from './pages/LandingPage';
-import DashboardPage from './pages/DashboardPage';
-import CoinsPage from './pages/CoinsPage';
+import { Route, BrowserRouter as Router, Routes } from 'react-router-dom';
+import NotificationToast from './components/NotificationToast';
 import AgentPage from './pages/AgentPage';
 import AnalyticsPage from './pages/AnalyticsPage';
-import SettingsPage from './pages/SettingsPage';
+import CoinsPage from './pages/CoinsPage';
 import ContractsPage from './pages/ContractsPage';
-import HistoryPage from './pages/HistoryPage';
+import DashboardPage from './pages/DashboardPage';
 import HeatmapPage from './pages/HeatmapPage';
-import NotificationToast from './components/NotificationToast';
+import HistoryPage from './pages/HistoryPage';
+import LandingPage from './pages/LandingPage';
+import SettingsPage from './pages/SettingsPage';
 
 function App() {
     return (

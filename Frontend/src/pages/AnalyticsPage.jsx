@@ -1,14 +1,22 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { motion } from 'framer-motion';
 import {
-    LayoutDashboard, BarChart3, Brain, Activity, Layers, LineChart,
-    TrendingUp, Gauge, Shield, Zap, Clock, Server, Wifi, WifiOff,
-    PieChart, ArrowUpRight, ArrowDownRight, Target
+    Activity,
+    ArrowDownRight,
+    ArrowUpRight,
+    Gauge,
+    Layers, LineChart,
+    PieChart,
+    Server,
+    Shield,
+    Target,
+    TrendingUp,
+    Wifi, WifiOff,
+    Zap
 } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
-import ArbixLogo from '../components/ArbixLogo';
-import Sidebar from '../components/Sidebar';
+import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import NetworkGraph from '../components/NetworkGraph';
+import Sidebar from '../components/Sidebar';
 
 const API = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
